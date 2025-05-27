@@ -1,0 +1,72 @@
+#include "main.h"
+
+// Chassis constructor
+ez::Drive chassis(
+	// These are your drive motors, the first motor is used for sensing!
+	{-4, -5, -6},  // Left Chassis Ports (negative port will reverse it!)
+	{1, 2, 3},	   // Right Chassis Ports (negative port will reverse it!)
+
+	21,				// IMU Port
+	2.8469137379,	// Wheel Diameter (Remember, 4" wheels without screw holes are actually 4.125!)
+	450);			// Wheel RPM = cartridge * (motor gear / wheel gear)
+
+void initialize() {
+	// Print our branding over your terminal :D
+	ez::ez_template_print();
+
+	pros::delay(500);  // Stop the user from doing anything while legacy ports configure
+
+	// Configure your chassis controls
+	chassis.opcontrol_curve_buttons_toggle(false);	// Enables modifying the controller curve with buttons on the joysticks
+	chassis.opcontrol_drive_activebrake_set(2.0);	// Sets the active brake kP. We recommend ~2.  0 will disable.
+	chassis.opcontrol_curve_default_set(
+		3.0, 0.0);	// Defaults for curve. If using tank, only the first parameter is used. (Comment this line out if you have an SD card!)
+
+	// Set the drive to your own constants from autons.cpp!
+	default_constants();
+
+	// Autonomous Selector using LLEMU
+	auton_sel.selector_populate({
+
+	});
+
+	// Initialize chassis and auton selector
+	chassis.initialize();
+	uiInit();
+	pros::Task ColorTask(colorTask);
+	pros::Task ControllerTask(controllerTask);
+	pros::Task PathViewerTask(pathViewerTask);
+	pros::Task AngleCheckTask(angleCheckTask);
+	master.rumble(chassis.drive_imu_calibrated() ? "." : "---");
+}
+
+void disabled() {
+	// . . .
+}
+
+void competition_initialize() { 
+	autonMode = AutonMode::BRAIN;
+ }
+
+void autonomous() {
+	chassis.pid_targets_reset();				// Resets PID targets to 0
+	chassis.drive_imu_reset();					// Reset gyro position to 0
+	chassis.drive_sensor_reset();				// Reset drive sensors to 0
+	chassis.odom_xyt_set(0_in, 0_in, 0_deg);	// Set the current position, you can start at a specific position with this
+	chassis.drive_brake_set(MOTOR_BRAKE_HOLD);	// Set motors to hold.  This helps autonomous consistency
+
+	autonMode = AutonMode::PLAIN;
+	autonPath = {};
+	auton_sel.selector_callback();	// Calls selected auton from autonomous selector
+}
+
+void opcontrol() {
+	chassis.drive_brake_set(pros::E_MOTOR_BRAKE_BRAKE);
+	autonMode = AutonMode::DRIVER;
+
+	while(true) {
+		chassis.opcontrol_tank();  // Tank control
+
+		pros::delay(ez::util::DELAY_TIME);	// This is used for timer calculations!  Keep this ez::util::DELAY_TIME
+	}
+}
