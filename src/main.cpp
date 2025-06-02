@@ -3,11 +3,11 @@
 // Chassis constructor
 ez::Drive chassis(
 	// These are your drive motors, the first motor is used for sensing!
-	{-4, -5, -6},  // Left Chassis Ports (negative port will reverse it!)
-	{1, 2, 3},	   // Right Chassis Ports (negative port will reverse it!)
+	{-1, -2, -3},  // Left Chassis Ports (negative port will reverse it!)
+	{10, 9, 8},	   // Right Chassis Ports (negative port will reverse it!)
 
-	21,				// IMU Port
-	2.8469137379,	// Wheel Diameter (Remember, 4" wheels without screw holes are actually 4.125!)
+	7,				// IMU Port
+	WHEEL_DIAMETER,	// Wheel Diameter (Remember, 4" wheels without screw holes are actually 4.125!)
 	450);			// Wheel RPM = cartridge * (motor gear / wheel gear)
 
 void initialize() {
@@ -27,7 +27,8 @@ void initialize() {
 
 	// Autonomous Selector using LLEMU
 	auton_sel.selector_populate({
-
+		{right_awp, "right_awp", "right side 3 + 1 + 5 solo AWP", violet},
+		{left_awp, "left_awp", "left side 1 + 5 + 3 solo AWP", pink}
 	});
 
 	// Initialize chassis and auton selector
@@ -66,6 +67,8 @@ void opcontrol() {
 
 	while(true) {
 		chassis.opcontrol_tank();  // Tank control
+
+		setIntakeOp();
 
 		pros::delay(ez::util::DELAY_TIME);	// This is used for timer calculations!  Keep this ez::util::DELAY_TIME
 	}

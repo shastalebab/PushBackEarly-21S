@@ -1,7 +1,6 @@
 #include "main.h"  // IWYU pragma: keep
 
 AutonMode autonMode = AutonMode::DRIVER;
-const double width = 12.5;
 Coordinate currentPoint = {0, 0, 0};
 vector<Coordinate> autonPath = {};
 
@@ -9,80 +8,112 @@ vector<Coordinate> autonPath = {};
 // Internal math
 //
 
-double getDistance(Coordinate point1, Coordinate point2, drive_directions direction) {
-	auto new_direction = direction == rev ? -1 : 1;
+double getDistance(Coordinate point1, Coordinate point2) {
 	double errorX = point2.x - point1.x;
 	double errorY = point2.y - point1.y;
-	return ((sqrt((errorX * errorX) + (errorY * errorY))) * new_direction);
+	return sqrt((errorX * errorX) + (errorY * errorY));
 }
 
 double getTheta(Coordinate point1, Coordinate point2, drive_directions direction) {
 	auto new_direction = direction == rev ? 180 : 0;
 	double errorX = point2.x - point1.x;
 	double errorY = point2.y - point1.y;
-	return ((atan2(errorX, errorY) * 180 / M_PI) + new_direction);
+	double theta = (atan2(errorX, errorY) * 180 / M_PI) + new_direction;
+	theta = fmod(theta, 360);
+	if(theta < 0) theta += 360;
+	return theta;
 }
 
-Coordinate getArc(Coordinate startpoint, double right, double left, double distance) {
-	// Get the coordinate within the reference frame of the robot of the end point
-	double radius = (right + left) / (right - left) * (width / 2);
-	double theta = ((right - left) / width * distance) + (startpoint.t * M_PI / 180);
+double getVelocity(double voltage) { return (2 * M_PI * (voltage / 127 * chassis.drive_rpm_get()) * WHEEL_DIAMETER) / 120; }
 
-	double relative_x = -((-radius * cos(theta) + radius) - (-radius * cos(startpoint.t * M_PI / 180) + radius));
-	double relative_y = -((radius * sin(theta)) - (radius * sin(startpoint.t * M_PI / 180)));
+double getTimeToPoint(double distance, double velocity) { return distance / velocity; }
+
+Coordinate getPoint(Coordinate startPoint, double distance) {
+	// Get the x and y error between the new point and the current point
+	double errorX = distance * (sin(startPoint.t * M_PI / 180));
+	double errorY = distance * (cos(startPoint.t * M_PI / 180));
+
+	// Add the error to the start point to create the end point
+	Coordinate endPoint = startPoint;
+	endPoint.x += errorX;
+	endPoint.y += errorY;
+
+	return endPoint;
+}
+
+Coordinate getPoint(Coordinate startPoint, double v_left, double v_right, double time) {
+	// Get the coordinate within the reference frame of the robot of the end point
+	double radius = (v_right + v_left) / (v_right - v_left) * (ROBOT_WIDTH / 2);
+	double theta = ((v_right - v_left) / ROBOT_WIDTH * time) + (startPoint.t * M_PI / 180);
+
+	double relative_x = -((-radius * cos(theta) + radius) - (-radius * cos(startPoint.t * M_PI / 180) + radius));
+	double relative_y = -((radius * sin(theta)) - (radius * sin(startPoint.t * M_PI / 180)));
 
 	theta *= 180 / M_PI;
-	if(theta < 0) theta += 360;
 	theta = fmod(theta, 360);
+	if(theta < 0) theta += 360;
 
 	Coordinate point_relative = {relative_x, relative_y, theta};
 
 	// Translate the point's x and y values by the start point's x and y values
-	point_relative.x += startpoint.x;
-	point_relative.y += startpoint.y;
+	point_relative.x += startPoint.x;
+	point_relative.y += startPoint.y;
 
 	return point_relative;
 }
 
-Coordinate getArcFromTheta(Coordinate startpoint, e_swing side, e_angle_behavior behavior, double right, double left, double theta) {
-	// Get the coordinate within the reference frame of the robot of the end point
-	double radius = (right + left) / (right - left) * (width / 2);
-	theta = fmod(theta, 360);
-	if(theta < 0) theta += 360;
+std::vector<Coordinate> injectPoint(Coordinate startPoint, Coordinate endPoint, e_angle_behavior behavior, double left, double right, double theta,
+									double lookAhead) {
+	// Make sure theta is positive
+	if(startPoint.t < 0) startPoint.t += 360;
 
-	double relative_x = -((-radius * cos(theta * M_PI / 180) + radius) - (-radius * cos(startpoint.t * M_PI / 180) + radius));
-	double relative_y = -((radius * sin(theta * M_PI / 180)) - (radius * sin(startpoint.t * M_PI / 180)));
+	// Get wheel velocities and proper time
+	double v_left = getVelocity(left);
+	double v_right = getVelocity(right);
+	double v_all = (v_left + v_right) / 2;
+	if(v_all == 0) v_all = v_left;
 
-	Coordinate point_relative = {relative_x, relative_y, theta};
-
-	// Translate the point's x and y values by the start point's x and y values
-	point_relative.x += startpoint.x;
-	point_relative.y += startpoint.y;
-
-	return point_relative;
-}
-
-std::vector<Coordinate> injectArc(Coordinate startpoint, e_swing side, e_angle_behavior behavior, double main, double opp, double theta, double lookAhead) {
-	double left = side == LEFT_SWING ? main : opp;
-	double right = side == RIGHT_SWING ? main : opp;
-
-	if(startpoint.t < 0) startpoint.t += 360;
+	double time = abs(getTimeToPoint(lookAhead, v_all));
 
 	std::vector<Coordinate> pointsBar;
-	double arciter = 0;
-	double arcdist = ((side == LEFT_SWING && behavior == ccw) || (side == RIGHT_SWING && behavior == cw)) ? .01 * lookAhead : -(.01 * lookAhead);
-	Coordinate newDist = getArc(startpoint, right, left, arciter);
+	Coordinate newPoint = startPoint;
+	double iter = 0;
 
 	theta = fmod(theta, 360);
 	if(theta < 0) theta += 360;
 
-	while(!(newDist.t > theta - (3.837 * lookAhead) && newDist.t < theta + (3.837 * lookAhead))) {
-		arciter += arcdist;
-		newDist = getArc(startpoint, right, left, arciter);
-		newDist.movement = MovementType::SWING;
-        newDist.main = main;
-		pointsBar.push_back(newDist);
-	}
+	if(left != KEY) {
+		if(left != right) {
+			// Make sure the robot travels in the correct direction
+			if(left == -right)
+				time *= -1;
+			else if(((left > right && behavior == cw) || (right > left && behavior == ccw)))
+				time *= -1;
+			// Inject points along curve
+			while(!(newPoint.t > theta - abs((v_right - v_left) / ROBOT_WIDTH * time * 180 / M_PI) &&
+					newPoint.t < theta + abs((v_right - v_left) / ROBOT_WIDTH * time * 180 / M_PI))) {
+				newPoint = getPoint(startPoint, v_left, v_right, iter);
+				newPoint.left = left;
+				newPoint.right = right;
+				iter += time;
+				pointsBar.push_back(newPoint);
+			}
+		} else {
+			// Set direction
+			if(left < 0) lookAhead *= -1;
+
+			// Inject points along straight line
+			while(getDistance(startPoint, newPoint) < getDistance(startPoint, endPoint)) {
+				newPoint = getPoint(startPoint, iter);
+				newPoint.left = left;
+				newPoint.right = right;
+				iter += lookAhead;
+				pointsBar.push_back(newPoint);
+			}
+		}
+	} else
+		pointsBar.push_back(endPoint);
+
 	return pointsBar;
 }
 
@@ -90,65 +121,12 @@ std::vector<Coordinate> injectPath(std::vector<Coordinate> coordList, double loo
 	if(coordList.size() > 1) {
 		std::vector<Coordinate> injectedList = {};
 		for(int i = 0; i < coordList.size() - 1; i++) {
-			if(coordList[i + 1].movement == MovementType::SWING) {
-				std::vector<Coordinate> swingList = injectArc(coordList[i], coordList[i + 1].side, coordList[i + 1].behavior, coordList[i + 1].main,
-															  coordList[i + 1].opp, coordList[i + 1].t, lookAhead);
-				injectedList.insert(injectedList.end(), swingList.begin(), swingList.end());
-			} else if(coordList[i + 1].movement == MovementType::DRIVE) {
-				drive_directions dir = coordList[i].x > coordList[i + 1].x ? rev : fwd;
-				double angle = getTheta(coordList[i], coordList[i + 1], dir);
-				double errorX = lookAhead * (sin(angle * M_PI / 180));
-				double errorY = lookAhead * (cos(angle * M_PI / 180));
-				Coordinate newDist = coordList[i];
-				injectedList.push_back(coordList[i]);
-				while(getDistance(coordList[i], newDist, fwd) < getDistance(coordList[i], coordList[i + 1], fwd)) {
-					newDist.x += errorX * (dir ? -1 : 1);
-					newDist.y += errorY * (dir ? -1 : 1);
-					newDist.t = coordList[i + 1].t;
-					newDist.facing = coordList[i + 1].facing;
-					newDist.movement = MovementType::DRIVE;
-					injectedList.push_back(newDist);
-				}
-				injectedList.pop_back();
-			}
+			std::vector<Coordinate> segList = injectPoint(coordList[i], coordList[i + 1], coordList[i + 1].behavior, coordList[i + 1].left,
+														  coordList[i + 1].right, coordList[i + 1].t, lookAhead);
+			injectedList.insert(injectedList.end(), segList.begin(), segList.end());
 		}
 		injectedList.push_back(coordList.back());
 		return injectedList;
-	}
-	return coordList;
-}
-
-std::vector<Coordinate> smoothPath(std::vector<Coordinate> coordList, int lookAhead, int smoothing) {
-	if(coordList.size() > 1) {
-		int stops = coordList.size();
-		for(int i = 0; i < smoothing; i++) {
-			coordList.push_back(coordList.back());
-		}
-		std::vector<Coordinate> smoothList = coordList;
-		Coordinate point_to_face;
-		for(int i = 0; i < stops; i++) {
-			bool checkSwing = false;
-			for(int j = 1; j < smoothing + 1; j++) {
-				if(coordList[i + j].movement == MovementType::SWING) {
-					checkSwing = true;
-					break;
-				}
-			}
-			if(!checkSwing) {
-				point_to_face = smoothList[i + smoothing];
-				smoothList[i].t = getTheta(smoothList[i], point_to_face, smoothList[i + smoothing].facing);
-			}
-			drive_directions dir = coordList[i].x > point_to_face.x ? rev : fwd;
-			double angle = getTheta(smoothList[i], point_to_face, dir);
-			if(coordList[i + 1].movement != MovementType::SWING) {
-				smoothList[i + 1].x = smoothList[i].x + (lookAhead * (sin(angle * M_PI / 180))) * (dir ? -1 : 1);
-				smoothList[i + 1].y = smoothList[i].y + (lookAhead * (cos(angle * M_PI / 180))) * (dir ? -1 : 1);
-			}
-		}
-		for(int i = 0; i < (smoothing); i++) {
-			smoothList.pop_back();
-		}
-		return smoothList;
 	}
 	return coordList;
 }
@@ -157,20 +135,11 @@ std::vector<Coordinate> smoothPath(std::vector<Coordinate> coordList, int lookAh
 // Set position wrappers
 //
 
-void setPosition(double x, double y) {
-	currentPoint.x = x;
-	currentPoint.y = y;
-	if(autonMode != AutonMode::BRAIN) chassis.odom_xy_set(currentPoint.x, currentPoint.y);
-	currentPoint.movement = MovementType::TURN;
-	autonPath.push_back(currentPoint);
-}
-
 void setPosition(double x, double y, double t) {
 	currentPoint.x = x;
 	currentPoint.y = y;
 	currentPoint.t = t;
-	if(autonMode != AutonMode::BRAIN)  chassis.odom_xyt_set(currentPoint.x, currentPoint.y, t);
-	currentPoint.movement = MovementType::TURN;
+	if(autonMode != AutonMode::BRAIN) chassis.odom_xyt_set(currentPoint.x, currentPoint.y, t);
 	autonPath.push_back(currentPoint);
 }
 
@@ -232,7 +201,7 @@ void pidWaitUntil(Coordinate coordinate) {
 	}
 }
 
-void delayMillis(int millis) {
+void delayMillis(int millis, bool ignore) {
 	switch(autonMode) {
 		case AutonMode::PLAIN:
 		case AutonMode::ODOM:
@@ -241,6 +210,15 @@ void delayMillis(int millis) {
 		default:
 			break;
 	}
+	if(!ignore) {
+	currentPoint.left = KEY;
+	currentPoint.right = millis;
+	autonPath.push_back(currentPoint);
+	}
+}
+
+void delayMillis(int millis) {
+	delayMillis(millis, false);
 }
 
 //
@@ -250,49 +228,21 @@ void delayMillis(int millis) {
 void moveToPoint(Coordinate newpoint, drive_directions direction, int speed) {
 	bool slew_state = false;
 	switch(autonMode) {
-		case AutonMode::PLAIN:
-			if(getDistance({chassis.odom_x_get(), chassis.odom_y_get()}, newpoint, direction) * okapi::inch > 24_in && speed > 90) slew_state = true;
-			chassis.pid_turn_set((getTheta({chassis.odom_x_get(), chassis.odom_y_get()}, newpoint, direction)) * okapi::degree, speed);
-			chassis.pid_wait_quick_chain();
-			chassis.pid_drive_set(getDistance({chassis.odom_x_get(), chassis.odom_y_get()}, newpoint, direction) * okapi::inch, speed, slew_state);
-			break;
 		case AutonMode::ODOM:
-			chassis.pid_odom_set({{newpoint.x * okapi::inch, newpoint.y * okapi::inch}, fwd, speed});
+			chassis.pid_odom_set({{newpoint.x * okapi::inch, newpoint.y * okapi::inch}, direction, speed});
+			currentPoint.t = getTheta({currentPoint.x, currentPoint.y}, newpoint, direction);
+			currentPoint.x = newpoint.x;
+			currentPoint.y = newpoint.y;
+			currentPoint.left = speed * (direction == fwd ? 1 : -1);
+			currentPoint.right = speed * (direction == fwd ? 1 : -1);
+			autonPath.push_back(currentPoint);
 			break;
 		default:
+			turnSet(getTheta(currentPoint, newpoint, direction), speed);
+			pidWait(Wait::CHAIN);
+			driveSet((getDistance(currentPoint, newpoint) * (direction == rev ? -1 : 1)), speed);
 			break;
 	}
-	currentPoint.t = getTheta({currentPoint.x, currentPoint.y}, newpoint, direction);
-	currentPoint.x = newpoint.x;
-	currentPoint.y = newpoint.y;
-	currentPoint.main = speed;
-	currentPoint.facing = direction;
-	currentPoint.movement = MovementType::DRIVE;
-	autonPath.push_back(currentPoint);
-}
-
-void moveToPoint(Coordinate currentpoint, Coordinate newpoint, drive_directions direction, int speed) {
-	bool slew_state = false;
-	switch(autonMode) {
-		case AutonMode::PLAIN:
-			if(getDistance({chassis.odom_x_get(), chassis.odom_y_get()}, newpoint, direction) * okapi::inch > 24_in && speed > 90) slew_state = true;
-			chassis.pid_turn_set((getTheta({chassis.odom_x_get(), chassis.odom_y_get()}, newpoint, direction)) * okapi::degree, speed);
-			chassis.pid_wait_quick_chain();
-			chassis.pid_drive_set(getDistance({chassis.odom_x_get(), chassis.odom_y_get()}, newpoint, direction) * okapi::inch, speed, slew_state);
-			break;
-		case AutonMode::ODOM:
-			chassis.pid_odom_set({{newpoint.x * okapi::inch, newpoint.y * okapi::inch}, fwd, speed});
-			break;
-		default:
-			break;
-	}
-	currentPoint.x += newpoint.x - currentpoint.x;
-	currentPoint.y += newpoint.y - currentpoint.y;
-	currentPoint.t = getTheta({currentPoint.x, currentPoint.y}, newpoint, direction);
-	currentPoint.main = speed;
-	currentPoint.facing = direction;
-	currentPoint.movement = MovementType::DRIVE;
-	autonPath.push_back(currentPoint);
 }
 
 //
@@ -300,70 +250,35 @@ void moveToPoint(Coordinate currentpoint, Coordinate newpoint, drive_directions 
 //
 
 void driveSet(double distance, int speed, bool slew) {
-	double errorX = distance * (sin(chassis.odom_theta_get() * M_PI / 180));
-	double errorY = distance * (cos(chassis.odom_theta_get() * M_PI / 180));
 	drive_directions direction = distance < 0 ? rev : fwd;
 	switch(autonMode) {
 		case AutonMode::PLAIN:
 			chassis.pid_drive_set(distance * okapi::inch, speed, false);
+			currentPoint.x = chassis.odom_x_get();
+			currentPoint.y = chassis.odom_y_get();
 			break;
 		case AutonMode::ODOM:
 			chassis.pid_odom_set(distance * okapi::inch, speed, false);
+			currentPoint.x = chassis.odom_x_get();
+			currentPoint.y = chassis.odom_y_get();
 			break;
 		default:
-			errorX = distance * (sin(currentPoint.t * M_PI / 180));
-			errorY = distance * (cos(currentPoint.t * M_PI / 180));
 			break;
 	}
-	currentPoint.x += errorX;
-	currentPoint.y += errorY;
-	currentPoint.main = speed;
-	currentPoint.facing = direction;
-	currentPoint.movement = MovementType::DRIVE;
+	currentPoint = getPoint(currentPoint, distance);
+	currentPoint.left = speed * (direction == fwd ? 1 : -1);
+	currentPoint.right = speed * (direction == fwd ? 1 : -1);
 	autonPath.push_back(currentPoint);
 }
 
 void driveSet(double distance, int speed) {
-	double errorX = distance * (sin(chassis.odom_theta_get() * M_PI / 180));
-	double errorY = distance * (cos(chassis.odom_theta_get() * M_PI / 180));
-	drive_directions direction = distance < 0 ? rev : fwd;
-	switch(autonMode) {
-		case AutonMode::PLAIN:
-			chassis.pid_drive_set(distance * okapi::inch, speed, false);
-			break;
-		case AutonMode::ODOM:
-			chassis.pid_odom_set(distance * okapi::inch, speed, false);
-			break;
-		default:
-			errorX = distance * (sin(currentPoint.t * M_PI / 180));
-			errorY = distance * (cos(currentPoint.t * M_PI / 180));
-			break;
-	}
-	currentPoint.x += errorX;
-	currentPoint.y += errorY;
-	currentPoint.main = speed;
-	currentPoint.facing = direction;
-	currentPoint.movement = MovementType::DRIVE;
-	autonPath.push_back(currentPoint);
+	bool slew = abs(distance) > 48 ? true : false;
+	driveSet(distance, speed, slew);
 }
 
 //
 // Turn set wrappers
 //
-
-void turnSet(double theta, int speed) {
-	switch(autonMode) {
-		case AutonMode::PLAIN:
-		case AutonMode::ODOM:
-			chassis.pid_turn_set(theta * okapi::degree, speed);
-			break;
-		default:
-			break;
-	}
-	currentPoint.movement = MovementType::TURN;
-	currentPoint.t = theta;
-	autonPath.push_back(currentPoint);
-}
 
 void turnSet(double theta, int speed, e_angle_behavior behavior) {
 	switch(autonMode) {
@@ -374,24 +289,29 @@ void turnSet(double theta, int speed, e_angle_behavior behavior) {
 		default:
 			break;
 	}
-	currentPoint.movement = MovementType::TURN;
+
+	if(behavior == shortest) behavior = (util::turn_shortest(theta, currentPoint.t) < currentPoint.t) ? ccw : cw;
+
+	if(behavior == ccw) speed *= -1;
+
 	currentPoint.t = theta;
+	currentPoint.left = speed;
+	currentPoint.right = -speed;
+	currentPoint.behavior = behavior;
 	autonPath.push_back(currentPoint);
 }
 
-void turnSet(Coordinate point, drive_directions direction, int speed) {
-	double theta = getTheta(currentPoint, point, direction);
+void turnSet(double theta, int speed) {
+	e_angle_behavior behavior = (util::turn_shortest(theta, currentPoint.t) < currentPoint.t) ? ccw : cw;
 	switch(autonMode) {
 		case AutonMode::PLAIN:
 		case AutonMode::ODOM:
-			chassis.pid_turn_set(theta * okapi::degree, speed);
+			behavior = (util::turn_shortest(theta, chassis.odom_theta_get()) < chassis.odom_theta_get()) ? ccw : cw;
 			break;
 		default:
 			break;
 	}
-	currentPoint.movement = MovementType::TURN;
-	currentPoint.t = theta;
-	autonPath.push_back(currentPoint);
+	turnSet(theta, speed, behavior);
 }
 
 void turnSet(Coordinate point, drive_directions direction, int speed, e_angle_behavior behavior) {
@@ -399,30 +319,27 @@ void turnSet(Coordinate point, drive_directions direction, int speed, e_angle_be
 	switch(autonMode) {
 		case AutonMode::PLAIN:
 		case AutonMode::ODOM:
-			chassis.pid_turn_set(theta * okapi::degree, speed, behavior);
+			theta = getTheta({chassis.odom_x_get(), chassis.odom_y_get(), chassis.odom_theta_get()}, point, direction);
 			break;
 		default:
 			break;
 	}
-	currentPoint.movement = MovementType::TURN;
-	currentPoint.t = theta;
-	autonPath.push_back(currentPoint);
+	turnSet(theta, speed, behavior);
 }
 
-void turnSetRelative(double theta, int speed) {
+void turnSet(Coordinate point, drive_directions direction, int speed) {
+	double theta = getTheta(currentPoint, point, direction);
+	e_angle_behavior behavior = (util::turn_shortest(theta, currentPoint.t) < currentPoint.t) ? ccw : cw;
 	switch(autonMode) {
 		case AutonMode::PLAIN:
 		case AutonMode::ODOM:
-			theta += chassis.odom_theta_get();
-			chassis.pid_turn_set((theta)*okapi::degree, speed);
+			behavior = (util::turn_shortest(theta, chassis.odom_theta_get()) < chassis.odom_theta_get()) ? ccw : cw;
+			theta = getTheta({chassis.odom_x_get(), chassis.odom_y_get(), chassis.odom_theta_get()}, point, direction);
 			break;
 		default:
-			theta += currentPoint.t;
 			break;
 	}
-	currentPoint.movement = MovementType::TURN;
-	currentPoint.t = theta;
-	autonPath.push_back(currentPoint);
+	turnSet(theta, speed, behavior);
 }
 
 void turnSetRelative(double theta, int speed, e_angle_behavior behavior) {
@@ -430,15 +347,31 @@ void turnSetRelative(double theta, int speed, e_angle_behavior behavior) {
 		case AutonMode::PLAIN:
 		case AutonMode::ODOM:
 			theta += chassis.odom_theta_get();
-			chassis.pid_turn_set((theta)*okapi::degree, speed, behavior);
 			break;
 		default:
 			theta += currentPoint.t;
 			break;
 	}
-	currentPoint.movement = MovementType::TURN;
-	currentPoint.t = theta;
-	autonPath.push_back(currentPoint);
+	fmod(theta, 360);
+	if(theta < 0) theta += 360;
+	turnSet(theta, speed, behavior);
+}
+
+void turnSetRelative(double theta, int speed) {
+	e_angle_behavior behavior = (util::turn_shortest(theta, currentPoint.t) < 0) ? ccw : cw;
+	switch(autonMode) {
+		case AutonMode::PLAIN:
+		case AutonMode::ODOM:
+			behavior = (util::turn_shortest(theta, chassis.odom_theta_get()) < 0) ? ccw : cw;
+			theta += chassis.odom_theta_get();
+			break;
+		default:
+			theta += currentPoint.t;
+			break;
+	}
+	fmod(theta, 360);
+	if(theta < 0) theta += 360;
+	turnSet(theta, speed, behavior);
 }
 
 //
@@ -454,85 +387,57 @@ void swingSet(e_swing side, double theta, double main, double opp, e_angle_behav
 		default:
 			break;
 	}
+
+	// Convert main/opposite voltages to left/right voltages
 	double right = side == RIGHT_SWING ? main : opp;
 	double left = side == LEFT_SWING ? main : opp;
-	currentPoint = getArcFromTheta(currentPoint, side, behavior, right, left, theta);
-	currentPoint.t = theta;
-	currentPoint.movement = MovementType::SWING;
-	currentPoint.side = side;
-	currentPoint.main = main;
-	currentPoint.opp = opp;
+
+	// Convert voltage to velocity
+	double v_left = getVelocity(left);
+	double v_right = getVelocity(right);
+	double v_all = (v_left + v_right) / 2;
+
+	// Get radius and arc length
+	double new_t = theta - currentPoint.t;
+	fmod(new_t, 360);
+	if(new_t < 0) new_t += 360;
+	double radius = (v_right + v_left) / (v_right - v_left) * (ROBOT_WIDTH / 2);
+	double arcLength = radius * new_t * M_PI / 180;
+
+	currentPoint = getPoint(currentPoint, v_left, v_right, getTimeToPoint(arcLength, v_all));
+
+	currentPoint.left = left;
+	currentPoint.right = right;
 	currentPoint.behavior = behavior;
-    currentPoint.facing = (side == LEFT_SWING && behavior == cw) || (side == RIGHT_SWING && behavior == ccw) ? fwd : rev;
 	autonPath.push_back(currentPoint);
 }
 
-void swingSet(e_swing side, double theta, double main, e_angle_behavior behavior) {
+void swingSet(ez::e_swing side, double theta, double main, ez::e_angle_behavior behavior) { swingSet(side, theta, main, 0, behavior); }
+
+void swingSet(ez::e_swing side, double theta, double main, double opp) {
+	e_angle_behavior behavior = (util::turn_shortest(theta, currentPoint.t) < 0) ? ccw : cw;
 	switch(autonMode) {
 		case AutonMode::PLAIN:
 		case AutonMode::ODOM:
-			chassis.pid_swing_set(side, theta * okapi::degree, main, 0, behavior);
+			behavior = (util::turn_shortest(theta, chassis.odom_theta_get()) < 0) ? ccw : cw;
 			break;
 		default:
 			break;
 	}
-	double right = side == RIGHT_SWING ? main : 0;
-	double left = side == LEFT_SWING ? main : 0;
-	currentPoint = getArcFromTheta(currentPoint, side, behavior, right, left, theta);
-	currentPoint.t = theta;
-	currentPoint.movement = MovementType::SWING;
-	currentPoint.side = side;
-	currentPoint.main = main;
-	currentPoint.opp = 0;
-	currentPoint.behavior = behavior;
-    currentPoint.facing = (side == LEFT_SWING && behavior == cw) || (side == RIGHT_SWING && behavior == ccw) ? fwd : rev;
-	autonPath.push_back(currentPoint);
+	swingSet(side, theta, main, opp, behavior);
 }
 
-void swingSet(e_swing side, double theta, double main, double opp) {
-	e_angle_behavior behavior = ((theta > 180) && (side == RIGHT_SWING)) || ((theta < 180) && (side == LEFT_SWING)) ? cw : ccw;
+void swingSet(ez::e_swing side, double theta, double main) {
+	e_angle_behavior behavior = (util::turn_shortest(theta, currentPoint.t) < 0) ? ccw : cw;
 	switch(autonMode) {
 		case AutonMode::PLAIN:
 		case AutonMode::ODOM:
-			chassis.pid_swing_set(side, theta * okapi::degree, main, opp, behavior);
+			behavior = (util::turn_shortest(theta, chassis.odom_theta_get()) < 0) ? ccw : cw;
 			break;
 		default:
 			break;
 	}
-	double right = side == RIGHT_SWING ? main : opp;
-	double left = side == LEFT_SWING ? main : opp;
-	currentPoint = getArcFromTheta(currentPoint, side, behavior, right, left, theta);
-	currentPoint.t = theta;
-	currentPoint.movement = MovementType::SWING;
-	currentPoint.side = side;
-	currentPoint.main = main;
-	currentPoint.opp = opp;
-	currentPoint.behavior = behavior;
-    currentPoint.facing = (side == LEFT_SWING && behavior == cw) || (side == RIGHT_SWING && behavior == ccw) ? fwd : rev;
-	autonPath.push_back(currentPoint);
-}
-
-void swingSet(e_swing side, double theta, double main) {
-	e_angle_behavior behavior = ((theta > 180) && (side == RIGHT_SWING)) || ((theta < 180) && (side == LEFT_SWING)) ? cw : ccw;
-	switch(autonMode) {
-		case AutonMode::PLAIN:
-		case AutonMode::ODOM:
-			chassis.pid_swing_set(side, theta, main);
-			break;
-		default:
-			break;
-	}
-	double right = side == RIGHT_SWING ? main : 0;
-	double left = side == LEFT_SWING ? main : 0;
-	currentPoint = getArcFromTheta(currentPoint, side, behavior, right, left, theta);
-	currentPoint.t = theta;
-	currentPoint.movement = MovementType::SWING;
-	currentPoint.side = side;
-	currentPoint.main = main;
-	currentPoint.opp = 0;
-	currentPoint.behavior = behavior;
-    currentPoint.facing = (side == LEFT_SWING && behavior == cw) || (side == RIGHT_SWING && behavior == ccw) ? fwd : rev;
-	autonPath.push_back(currentPoint);
+	swingSet(side, theta, main, 0, behavior);
 }
 
 //
@@ -551,15 +456,6 @@ void getPathInjected() {
 	auto injected = injectPath(autonPath, 2);
 	cout << "===========================================" << endl;
 	for(auto point : injected) {
-		cout << "(" << point.x << ", " << point.y << ")" << endl;
-	}
-	cout << "===========================================" << endl;
-}
-
-void getPathSmooth() {
-	auto smoothened = smoothPath(injectPath(autonPath, 1), 1, 4);
-	cout << "===========================================" << endl;
-	for(auto point : smoothened) {
 		cout << "(" << point.x << ", " << point.y << ")" << endl;
 	}
 	cout << "===========================================" << endl;

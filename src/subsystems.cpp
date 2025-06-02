@@ -4,35 +4,57 @@
 Colors allianceColor = Colors::NEUTRAL;
 Colors matchColor = allianceColor;
 int intakeTarget = 0;
+int sortTarget = 0;
+bool inputLock = false;
 
 //
 // Wrappers
 //
 
-void setIntake(int speed) {
+void setIntake(int first_speed, int second_speed, int third_speed) {
 	if(autonMode != AutonMode::BRAIN) {
-		intake.move(speed);
-		intakeTarget = speed;
+		intakeFirst.move(first_speed);
+		intakeSecond.move(second_speed);
+		intakeThird.move(third_speed);
+		intakeTarget = second_speed;
+		sortTarget = third_speed;
 	}
 }
+
+void setIntake(int intake_speed, int outtake_speed) { setIntake(intake_speed, outtake_speed, outtake_speed); }
+
+void setIntake(int speed) { setIntake(speed, speed, speed); }
 
 void setAlliance(Colors alliance) {
 	allianceColor = alliance;
 	matchColor = alliance;
 }
+
 void sendHaptic(string input) { controllerInput = input; }
 
 //
 // Operator Control
 //
 
+bool shift() { return master.get_digital(pros::E_CONTROLLER_DIGITAL_R1); }
+
 void setIntakeOp() {
-	if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L2))
-		setIntake(127);
-	else if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L1))
-		setIntake(-127);
-	else {
-		setIntake(0);
+	if(shift()) {
+		if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L1))
+			setIntake(127,  0);
+		else if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L2))
+			setIntake(127, 127, -127);
+		else {
+			setIntake(0);
+		}
+	} else if(!inputLock) {
+		if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L1))
+			setIntake(127);
+		else if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L2))
+			setIntake(-127);
+		else {
+			setIntake(0);
+		}
 	}
 }
 
@@ -47,14 +69,14 @@ void colorToggle() {
 		allianceColor = matchColor;
 }
 
-void colorSet(Colors color) {
+void colorSet(Colors color, lv_obj_t* object) {
 	// Set on screen elements to the corresponding color
 	lv_color32_t color_use = theme_accent;
 	if(color == Colors::RED)
 		color_use = red;
 	else if(color == Colors::BLUE)
 		color_use = blue;
-	lv_obj_set_style_bg_color(colorind, color_use, LV_PART_MAIN);
+	lv_obj_set_style_bg_color(object, color_use, LV_PART_MAIN);
 }
 
 Colors colorGet() {
@@ -81,9 +103,18 @@ void colorTask() {
 	colorSens.set_led_pwm(100);
 	while(true) {
 		color = colorGet();
-		colorSet(color);
+		colorSet(color, colorInd);
 		if(!pros::competition::is_disabled()) {
-			// COLOR SORT ALG
+			if(colorCompare(color) && sortTime < 10) {
+				inputLock = true;
+				intakeThird.move(-sortTarget);
+				sortTime++;
+				pros::delay(100);
+			} else {
+				sortTime = 0;
+				inputLock = false;
+				intakeThird.move(sortTarget);
+			}
 		}
 		pros::delay(10);
 	}
@@ -103,10 +134,8 @@ void controllerTask() {
 		if(!pros::competition::is_autonomous() && !pros::competition::is_disabled()) {
 			if(pattern == "") {
 				if(timer == 475)
-					pattern = "-";
-				else if(timer == 375)
-					pattern = "--";
-				else if((timer >= 350 && timer < 375) || (timer >= 500 && timer < 525))
+					pattern = "- -";
+				else if(timer >= 500 && timer < 525)
 					pattern = ".";
 				else
 					pattern = controllerInput;
@@ -118,13 +147,13 @@ void controllerTask() {
 			}
 			timer++;
 		}
-		pros::delay(50);
+		pros::delay(100);
 
 		// Update temperature variables and print to controller
 		tempDrive = (chassis.left_motors[0].get_temperature() + chassis.left_motors[1].get_temperature() + chassis.left_motors[2].get_temperature() +
 					 chassis.right_motors[0].get_temperature() + chassis.right_motors[1].get_temperature() + chassis.right_motors[2].get_temperature()) /
 					6;
-		tempIntake = intake.get_temperature();
+		tempIntake = (intakeFirst.get_temperature(0) + intakeFirst.get_temperature(1) + intakeSecond.get_temperature() + intakeThird.get_temperature()) / 4;
 
 		if(tempDrive <= 30)
 			pros::c::controller_print(pros::E_CONTROLLER_MASTER, 0, 0, "drive: cool, %.0f°C", tempDrive);
@@ -143,31 +172,3 @@ void controllerTask() {
 		pros::delay(50);
 	}
 }
-
-/*
-void unjamTask() {
-	int jamtime = 0;
-	while(true) {
-		if(intake.get_temperature() < 50) {
-				if(!jamState && !jamDisabled && intakeTarget != 0 && abs(intake.get_actual_velocity()) <= 20) {
-					jamtime++;
-					if(jamtime > 20) {
-						jamtime = 0;
-						jamState = true;
-					}
-				}
-
-				if(jamState) {
-					intake.move(-intakeTarget);
-					jamtime++;
-					if(jamtime > 20) {
-						jamtime = 0;
-						jamState = false;
-						setIntake(intakeTarget);
-					}
-				}
-			}
-		pros::delay(10);
-	}
-}
-*/

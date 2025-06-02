@@ -2,6 +2,7 @@
 
 #include "EZ-Template/api.hpp"
 #include "api.h"
+#include "pros/motor_group.hpp"
 
 extern Drive chassis;
 
@@ -9,21 +10,28 @@ extern Drive chassis;
 
 inline pros::Optical colorSens(11);
 
-inline pros::Motor intake(7);
+inline pros::MotorGroup intakeFirst({5, -6});
+inline pros::Motor intakeSecond(7);
+inline pros::Motor intakeThird(-4);
 
-enum class Colors {
-    RED = 0,
-    BLUE = 1,
-    NEUTRAL = 2
+enum Colors {
+    BLUE = 0,
+    NEUTRAL = 1,
+    RED = 2
 };
 
 extern Colors allianceColor;
 extern Colors matchColor;
 
+bool shift();
+
+void setIntake(int first_speed, int second_speed, int third_speed);
+void setIntake(int intake_speed, int outtake_speed);
 void setIntake(int speed);
 
 void setAlliance(Colors alliance);
 void colorToggle();
+void colorSet(Colors color, lv_obj_t * object);
 
 void sendHaptic(string input);
 
@@ -31,4 +39,3 @@ void setIntakeOp();
 
 void colorTask();
 void controllerTask();
-void unjamTask();

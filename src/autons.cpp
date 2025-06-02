@@ -1,4 +1,3 @@
-#include "autons.hpp"
 #include "main.h"  // IWYU pragma: keep
 
 /////
@@ -9,7 +8,7 @@
 // These are out of 127
 const int DRIVE_SPEED = 110;
 const int TURN_SPEED = 90;
-const int SWING_SPEED = 110;
+const int SWING_SPEED = 90;
 
 ///
 // Constants
@@ -51,4 +50,93 @@ void default_constants() {
 
 void move_forward() {
 	driveSet(24, 127);
+}
+
+//
+// RIGHT AUTONS
+//
+
+void right_awp() {
+	setPosition(83.44, 18.86, 45);
+	// Collect and score middle three blocks in low goal
+	driveSet(29.5, DRIVE_SPEED);
+	pidWait(WAIT);
+	turnSet(-45, TURN_SPEED);
+	pidWait(WAIT);
+	setIntake(127, 0, 0);
+	driveSet(26, 80);
+	pidWait(WAIT);
+	setIntake(-127, 0, 0);
+	delayMillis(1000);
+	// Score preload on high goal
+	swingSet(RIGHT_SWING, 135, SWING_SPEED);
+	pidWait(CHAIN);
+	driveSet(-10, 90);
+	setIntake(127);
+	pidWait(WAIT);
+	delayMillis(1000);
+	// Grab blocks under long goal
+	swingSet(RIGHT_SWING, 45, SWING_SPEED, 55, ccw);
+	pidWait(CHAIN);
+	setIntake(127, 0, 0);
+	driveSet(10, DRIVE_SPEED);
+	pidWait(WAIT);
+	swingSet(LEFT_SWING, 294, SWING_SPEED, 50, ccw);
+	pidWait(CHAIN);
+	turnSet(180, TURN_SPEED);
+	// Grab blocks from loader and score on long goal
+	driveSet(18, DRIVE_SPEED);
+	pidWait(WAIT);
+	delayMillis(500);
+	driveSet(-29.5, DRIVE_SPEED);
+	pidWait(WAIT);
+	setIntake(127);
+}
+
+//
+// LEFT AUTONS
+//
+
+void left_awp() {
+	setPosition(60.56, 18.86, -45);
+	// Approach bottom goal
+	driveSet(16, DRIVE_SPEED);
+	pidWait(WAIT);
+	turnSet(45, TURN_SPEED);
+	pidWait(WAIT);
+	driveSet(36, DRIVE_SPEED);
+	pidWait(WAIT);
+	// Score preload on bottom goal (placed on top of side rollers, wedged in first stage)
+	setIntake(-127);
+	delayMillis(250);
+	setIntake(127, 0, 0);
+	// Grab 5 blocks
+	driveSet(-11, 80);
+	pidWait(WAIT);
+	turnSet(-90, TURN_SPEED);
+	pidWait(CHAIN);
+	swingSet(ez::LEFT_SWING, -45, SWING_SPEED, 70, cw);
+	pidWait(WAIT);
+	delayMillis(750);
+	// Score 5 blocks on top goal
+	swingSet(ez::LEFT_SWING, -90, SWING_SPEED, 59.7, ccw);
+	pidWait(WAIT);
+	turnSet(225, TURN_SPEED);
+	pidWait(WAIT);
+	driveSet(-5.5, 80);
+	pidWait(WAIT);
+	setIntake(127);
+	delayMillis(1200);
+	// Grab blocks from loader and score on long goal
+	driveSet(47, DRIVE_SPEED);
+	pidWait(WAIT);
+	turnSet(180, TURN_SPEED);
+	pidWait(WAIT);
+	driveSet(14, DRIVE_SPEED);
+	pidWait(WAIT);
+	setIntake(127, 0, 0);
+	delayMillis(750);
+	driveSet(-29, DRIVE_SPEED);
+	pidWait(WAIT);
+	setIntake(127);
 }
