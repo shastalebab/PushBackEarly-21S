@@ -14,14 +14,14 @@ bool inputLock = false;
 void setIntake(int first_speed, int second_speed, int third_speed) {
 	if(autonMode != AutonMode::BRAIN) {
 		intakeFirst.move(first_speed);
-		intakeSecond.move(second_speed);
-		intakeThird.move(third_speed);
+		intakeSorter.move(second_speed);
+		intakeIndexer.move(third_speed);
 		intakeTarget = second_speed;
 		sortTarget = third_speed;
 	}
 }
 
-void setIntake(int intake_speed, int outtake_speed) { setIntake(intake_speed, outtake_speed, outtake_speed); }
+void setIntake(int intake_speed, int outtake_speed) { setIntake(intake_speed, intake_speed, outtake_speed); }
 
 void setIntake(int speed) { setIntake(speed, speed, speed); }
 
@@ -36,26 +36,32 @@ void sendHaptic(string input) { controllerInput = input; }
 // Operator Control
 //
 
-bool shift() { return master.get_digital(pros::E_CONTROLLER_DIGITAL_R1); }
+bool shift() { return master.get_digital(pros::E_CONTROLLER_DIGITAL_R2); }
 
 void setIntakeOp() {
 	if(shift()) {
-		if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L1))
-			setIntake(127,  0);
+		if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L1)) // sorting
+			setIntake(127, -127, 0);
 		else if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L2))
-			setIntake(127, 127, -127);
+			setIntake(-127, 0); // low goal evil scoring
+		else if(master.get_digital(pros::E_CONTROLLER_DIGITAL_R1))
+			setIntake(127, 127, -90); // mid goal scoring
 		else {
 			setIntake(0);
 		}
 	} else if(!inputLock) {
-		if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L1))
+		if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L1)) // stowing
+			setIntake(127, 0);
+		else if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L2)) // low goal safe scoring
+			setIntake(-90, -127, 0);
+		else if(master.get_digital(pros::E_CONTROLLER_DIGITAL_R1)) // top goal scoring scoring
 			setIntake(127);
-		else if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L2))
-			setIntake(-127);
 		else {
 			setIntake(0);
 		}
 	}
+
+	if(master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_R2)) sendHaptic(".");
 }
 
 //
@@ -107,13 +113,13 @@ void colorTask() {
 		if(!pros::competition::is_disabled()) {
 			if(colorCompare(color) && sortTime < 10) {
 				inputLock = true;
-				intakeThird.move(-sortTarget);
+				intakeIndexer.move(-sortTarget);
 				sortTime++;
 				pros::delay(100);
 			} else {
 				sortTime = 0;
 				inputLock = false;
-				intakeThird.move(sortTarget);
+				intakeIndexer.move(sortTarget);
 			}
 		}
 		pros::delay(10);
@@ -134,9 +140,9 @@ void controllerTask() {
 		if(!pros::competition::is_autonomous() && !pros::competition::is_disabled()) {
 			if(pattern == "") {
 				if(timer == 475)
-					pattern = "- -";
+					pattern = ""; // "- -"
 				else if(timer >= 500 && timer < 525)
-					pattern = ".";
+					pattern = ""; // "."
 				else
 					pattern = controllerInput;
 			}
@@ -153,7 +159,7 @@ void controllerTask() {
 		tempDrive = (chassis.left_motors[0].get_temperature() + chassis.left_motors[1].get_temperature() + chassis.left_motors[2].get_temperature() +
 					 chassis.right_motors[0].get_temperature() + chassis.right_motors[1].get_temperature() + chassis.right_motors[2].get_temperature()) /
 					6;
-		tempIntake = (intakeFirst.get_temperature(0) + intakeFirst.get_temperature(1) + intakeSecond.get_temperature() + intakeThird.get_temperature()) / 4;
+		tempIntake = (intakeFirst.get_temperature(0) + intakeFirst.get_temperature(1) + intakeSorter.get_temperature() + intakeIndexer.get_temperature()) / 4;
 
 		if(tempDrive <= 30)
 			pros::c::controller_print(pros::E_CONTROLLER_MASTER, 0, 0, "drive: cool, %.0f°C", tempDrive);

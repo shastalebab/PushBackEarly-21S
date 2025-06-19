@@ -10,9 +10,9 @@ extern Drive chassis;
 
 inline pros::Optical colorSens(11);
 
-inline pros::MotorGroup intakeFirst({5, -6});
-inline pros::Motor intakeSecond(7);
-inline pros::Motor intakeThird(-4);
+inline pros::Motor intakeFirst(-6);
+inline pros::Motor intakeSorter(5);
+inline pros::Motor intakeIndexer(4);
 
 enum Colors {
     BLUE = 0,

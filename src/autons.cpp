@@ -63,10 +63,10 @@ void right_awp() {
 	pidWait(WAIT);
 	turnSet(-45, TURN_SPEED);
 	pidWait(WAIT);
-	setIntake(127, 0, 0);
+	setIntake(127, 0);
 	driveSet(26, 80);
 	pidWait(WAIT);
-	setIntake(-127, 0, 0);
+	setIntake(-127, 0);
 	delayMillis(1000);
 	// Score preload on high goal
 	swingSet(RIGHT_SWING, 135, SWING_SPEED);
@@ -78,7 +78,7 @@ void right_awp() {
 	// Grab blocks under long goal
 	swingSet(RIGHT_SWING, 45, SWING_SPEED, 55, ccw);
 	pidWait(CHAIN);
-	setIntake(127, 0, 0);
+	setIntake(127, 0);
 	driveSet(10, DRIVE_SPEED);
 	pidWait(WAIT);
 	swingSet(LEFT_SWING, 294, SWING_SPEED, 50, ccw);
@@ -109,7 +109,7 @@ void left_awp() {
 	// Score preload on bottom goal (placed on top of side rollers, wedged in first stage)
 	setIntake(-127);
 	delayMillis(250);
-	setIntake(127, 0, 0);
+	setIntake(127, 0);
 	// Grab 5 blocks
 	driveSet(-11, 80);
 	pidWait(WAIT);
@@ -134,7 +134,7 @@ void left_awp() {
 	pidWait(WAIT);
 	driveSet(14, DRIVE_SPEED);
 	pidWait(WAIT);
-	setIntake(127, 0, 0);
+	setIntake(127, 0);
 	delayMillis(750);
 	driveSet(-29, DRIVE_SPEED);
 	pidWait(WAIT);
