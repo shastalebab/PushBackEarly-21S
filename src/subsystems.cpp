@@ -1,12 +1,11 @@
 #include "main.h"  // IWYU pragma: keep
-#include "pros/misc.h"
-#include "pros/misc.hpp"
 
 // Internal targets to aid tasks
 Colors allianceColor = Colors::NEUTRAL;
 Colors matchColor = allianceColor;
 int firstTarget = 0;
 int sorterTarget = 0;
+int hoarderTarget = 0;
 int indexerTarget = 0;
 bool inputLock = false;
 bool jamDelay = false;
@@ -14,13 +13,14 @@ bool jamDelay = false;
 // Complex motors
 Jammable first = Jammable(&intakeFirst, &firstTarget, 20, 60, true, false);
 Jammable sorter = Jammable(&intakeSorter, &sorterTarget, 20, 50, false, false);
+Jammable hoarder = Jammable(&intakeHoarder, &hoarderTarget, 20, 50, true, false);
 Jammable indexer = Jammable(&intakeIndexer, &indexerTarget, 20, 100, true, false);
 
 //
 // Wrappers
 //
 
-void setIntake(int first_speed, int second_speed, int third_speed) {
+void setIntake(int first_speed, int second_speed, int third_speed, int fourth_speed) {
 	if(autonMode != AutonMode::BRAIN) {
 		if(first.lock != true) {
 			first.motor->move(first_speed);
@@ -28,18 +28,24 @@ void setIntake(int first_speed, int second_speed, int third_speed) {
 		if(sorter.lock != true) {
 			sorter.motor->move(second_speed);
 		}
+		if(hoarder.lock != true) {
+			hoarder.motor->move(third_speed);
+		}
 		if(indexer.lock != true) {
-			indexer.motor->move(third_speed);
+			indexer.motor->move(fourth_speed);
 		}
 		firstTarget = first_speed;
 		sorterTarget = second_speed;
-		indexerTarget = third_speed;
+		hoarderTarget = third_speed;
+		indexerTarget = fourth_speed;
 	}
 }
 
-void setIntake(int intake_speed, int outtake_speed) { setIntake(intake_speed, intake_speed, outtake_speed); }
+void setIntake(int intake_speed, int snail_speed, int outtake_speed) { setIntake(intake_speed, snail_speed, snail_speed, outtake_speed); }
 
-void setIntake(int speed) { setIntake(speed, speed, speed); }
+void setIntake(int intake_speed, int outtake_speed) { setIntake(intake_speed, intake_speed, intake_speed, outtake_speed); }
+
+void setIntake(int speed) { setIntake(speed, speed, speed, speed); }
 
 void setScraper(bool state) {
 	if(autonMode != AutonMode::BRAIN) {
@@ -66,28 +72,30 @@ void setIntakeOp() {
 		jamDelay = true;
 	if(shift()) {
 		if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L1))  // sorting
-			setIntake(127, -127, -5);
+			setIntake(127, 0, 0);
 		else if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L2))	// low goal evil scoring
-			setIntake(-127, 0);
+			setIntake(-127, 127, -127);
 		else if(master.get_digital(pros::E_CONTROLLER_DIGITAL_R1))	// mid goal scoring
-			setIntake(127, -90);
+			setIntake(127, -127);
 		else {
 			setIntake(0);
 			first.lock = false;
 			sorter.lock = false;
+			hoarder.lock = false;
 			indexer.lock = false;
 		}
 	} else if(!inputLock) {
 		if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L1))  // stowing
-			setIntake(127, -5);
+			setIntake(127, 127, -127, 127);
 		else if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L2))	// low goal safe scoring
-			setIntake(-90, -127, 0);
+			setIntake(-90, 127, -127);
 		else if(master.get_digital(pros::E_CONTROLLER_DIGITAL_R1))	// top goal scoring scoring
-			setIntake(127, 90);
+			setIntake(127);
 		else {
 			setIntake(0);
 			first.lock = false;
 			sorter.lock = false;
+			hoarder.lock = false;
 			indexer.lock = false;
 		}
 	}

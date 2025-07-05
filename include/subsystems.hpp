@@ -10,9 +10,10 @@ extern Drive chassis;
 
 inline pros::Optical colorSens(1);
 
-inline pros::Motor intakeFirst(-6);
+inline pros::Motor intakeFirst(4);
 inline pros::Motor intakeSorter(5);
-inline pros::Motor intakeIndexer(17);
+inline pros::Motor intakeHoarder(6);
+inline pros::Motor intakeIndexer(7);
 inline ez::Piston scraper('A');
 
 class Jammable {
@@ -57,7 +58,8 @@ extern Colors matchColor;
 
 bool shift();
 
-void setIntake(int first_speed, int second_speed, int third_speed);
+void setIntake(int first_speed, int second_speed, int third_speed, int fourth_speed);
+void setIntake(int intake_speed, int snail_speed, int outtake_speed);
 void setIntake(int intake_speed, int outtake_speed);
 void setIntake(int speed);
 void setScraper(bool state);
