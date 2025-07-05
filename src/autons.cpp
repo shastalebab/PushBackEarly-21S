@@ -1,4 +1,7 @@
+#include "EZ-Template/util.hpp"
+#include "drive.hpp"
 #include "main.h"  // IWYU pragma: keep
+#include "subsystems.hpp"
 
 /////
 // For installation, upgrading, documentations, and tutorials, check out our website!
@@ -48,13 +51,53 @@ void default_constants() {
 	chassis.pid_angle_behavior_set(shortest);  // Changes the default behavior for turning, this defaults it to the shortest path there
 }
 
-void move_forward() {
-	driveSet(24, 127);
-}
+void move_forward() { driveSet(24, 127); }
 
 //
 // RIGHT AUTONS
 //
+
+void right_split() {
+	setPosition(85.44, 20.86, 45);
+	// Collect and score middle three blocks in low goal
+	driveSet(30, DRIVE_SPEED);
+	pidWait(WAIT);
+	swingSet(LEFT_SWING, -45, 50, -20, ccw);
+	pidWait(WAIT);
+	setIntake(127, -5);
+	driveSet(30, 40);
+	pidWait(WAIT);
+	delayMillis(100);
+	setIntake(-90, -127, 0);
+	delayMillis(1000);
+	// Grab blocks under long goal
+	setIntake(0);
+	swingSet(RIGHT_SWING, 60, SWING_SPEED);
+	pidWait(CHAIN);
+	driveSet(29.5, 90);
+	setIntake(127, -5);
+	pidWait(WAIT);
+	setScraper(true);
+	delayMillis(500);
+	// Align to loader/long goal
+	swingSet(LEFT_SWING, 45, SWING_SPEED, 55, ccw);
+	pidWait(CHAIN);
+	swingSet(LEFT_SWING, 232, SWING_SPEED, 35, ccw);
+	pidWait(CHAIN);
+	turnSet(180, TURN_SPEED);
+	pidWait(WAIT);
+	// Grab blocks from loader and score on long goal
+	driveSet(21, 80);
+	delayMillis(1500);
+	driveSet(-8, DRIVE_SPEED);
+	pidWait(CHAIN);
+	turnSet(0, TURN_SPEED);
+	pidWait(WAIT);
+	setScraper(false);
+	driveSet(12.5, DRIVE_SPEED);
+	pidWait(WAIT);
+	setIntake(127, -127);
+}
 
 void right_awp() {
 	setPosition(83.44, 18.86, 45);
@@ -96,6 +139,47 @@ void right_awp() {
 //
 // LEFT AUTONS
 //
+
+void left_split() {
+	setPosition(58.56, 20.86, -45);
+	// Collect and score middle three blocks in low goal
+	driveSet(30, DRIVE_SPEED);
+	pidWait(WAIT);
+	swingSet(RIGHT_SWING, 45, 50, -20, cw);
+	pidWait(WAIT);
+	setIntake(127, -5);
+	driveSet(30, 40);
+	pidWait(WAIT);
+	setIntake(127, 127);
+	delayMillis(1500);
+	// Grab blocks under long goal
+	setIntake(0);
+	swingSet(LEFT_SWING, -60, SWING_SPEED);
+	pidWait(CHAIN);
+	driveSet(29.5, 90);
+	setIntake(127, -5);
+	pidWait(WAIT);
+	setScraper(true);
+	delayMillis(500);
+	// Align to loader/long goal
+	swingSet(RIGHT_SWING, -45, SWING_SPEED, 55, cw);
+	pidWait(CHAIN);
+	swingSet(RIGHT_SWING, -232, SWING_SPEED, 35, cw);
+	pidWait(CHAIN);
+	turnSet(180, TURN_SPEED);
+	pidWait(WAIT);
+	// Grab blocks from loader and score on long goal
+	driveSet(21, 80);
+	delayMillis(1500);
+	driveSet(-8, DRIVE_SPEED);
+	pidWait(CHAIN);
+	turnSet(0, TURN_SPEED);
+	pidWait(WAIT);
+	setScraper(false);
+	driveSet(12.5, DRIVE_SPEED);
+	pidWait(WAIT);
+	setIntake(127, -127);
+}
 
 void left_awp() {
 	setPosition(60.56, 18.86, -45);

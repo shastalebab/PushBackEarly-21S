@@ -1,7 +1,7 @@
 {
   "py/object": "pros.conductor.project.Project",
   "py/state": {
-    "project_name": "pushback-21S",
+    "project_name": "Pillbug-21S",
     "target": "v5",
     "templates": {
       "EZ-Template": {

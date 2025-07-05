@@ -28,6 +28,7 @@ class AutonObj {
 class AutonSel {
     public:
         vector<AutonObj> autons = {};
+        string selector_name = "";
         function<void()> selector_callback = move_forward;
         void selector_populate(vector<AutonObj> auton_list);
 };

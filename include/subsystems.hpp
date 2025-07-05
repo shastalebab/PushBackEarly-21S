@@ -2,23 +2,55 @@
 
 #include "EZ-Template/api.hpp"
 #include "api.h"
-#include "pros/motor_group.hpp"
+#include "pros/motors.hpp"
 
 extern Drive chassis;
 
 // Your motors, sensors, etc. should go here.  Below are examples
 
-inline pros::Optical colorSens(11);
+inline pros::Optical colorSens(1);
 
 inline pros::Motor intakeFirst(-6);
 inline pros::Motor intakeSorter(5);
-inline pros::Motor intakeIndexer(4);
+inline pros::Motor intakeIndexer(17);
+inline ez::Piston scraper('A');
 
-enum Colors {
-    BLUE = 0,
-    NEUTRAL = 1,
-    RED = 2
+class Jammable {
+   private:
+	int clock = 0;
+
+   public:
+	pros::Motor* motor;
+	int* target;
+	int limit;
+	float maxTemp;
+	bool ignoreSort;
+	bool pause;
+
+    bool lock;
+	void checkJam();
+
+	Jammable() {
+		motor = &intakeFirst;
+		target = 0;
+		limit = 4;
+		maxTemp = 55;
+		ignoreSort = true;
+		pause = false;
+        lock = false;
+	}
+	Jammable(pros::Motor* Motor, int* Target, int Limit, float MaxTemp, bool IgnoreSort, bool Pause) {
+        motor = Motor;
+		target = Target;
+		limit = Limit;
+		maxTemp = MaxTemp;
+		ignoreSort = IgnoreSort;
+		pause = Pause;
+        lock = false;
+    }
 };
+
+enum Colors { BLUE = 0, NEUTRAL = 1, RED = 2 };
 
 extern Colors allianceColor;
 extern Colors matchColor;
@@ -28,14 +60,17 @@ bool shift();
 void setIntake(int first_speed, int second_speed, int third_speed);
 void setIntake(int intake_speed, int outtake_speed);
 void setIntake(int speed);
+void setScraper(bool state);
 
 void setAlliance(Colors alliance);
 void colorToggle();
-void colorSet(Colors color, lv_obj_t * object);
+void colorSet(Colors color, lv_obj_t* object);
 
 void sendHaptic(string input);
 
 void setIntakeOp();
+void setScraperOp();
 
 void colorTask();
+void antiJamTask();
 void controllerTask();

@@ -3,8 +3,8 @@
 // Chassis constructor
 ez::Drive chassis(
 	// These are your drive motors, the first motor is used for sensing!
-	{-1, -2, -3},  // Left Chassis Ports (negative port will reverse it!)
-	{10, 9, 8},	   // Right Chassis Ports (negative port will reverse it!)
+	{-16, -18, -20},  // Left Chassis Ports (negative port will reverse it!)
+	{9, 8, 10},	   // Right Chassis Ports (negative port will reverse it!)
 
 	7,				// IMU Port
 	WHEEL_DIAMETER,	// Wheel Diameter (Remember, 4" wheels without screw holes are actually 4.125!)
@@ -27,7 +27,9 @@ void initialize() {
 
 	// Autonomous Selector using LLEMU
 	auton_sel.selector_populate({
+		{right_split, "right_split", "right side 4 + 5", gray},
 		{right_awp, "right_awp", "right side 3 + 1 + 5 solo AWP", violet},
+		{left_split, "left_split", "left side 4 + 5", lv_color_lighten(gray, 125)},
 		{left_awp, "left_awp", "left side 1 + 5 + 3 solo AWP", pink}
 	});
 
@@ -35,6 +37,7 @@ void initialize() {
 	chassis.initialize();
 	uiInit();
 	pros::Task ColorTask(colorTask);
+	pros::Task AntiJamTask(antiJamTask);
 	pros::Task ControllerTask(controllerTask);
 	pros::Task PathViewerTask(pathViewerTask);
 	pros::Task AngleCheckTask(angleCheckTask);
@@ -69,6 +72,7 @@ void opcontrol() {
 		chassis.opcontrol_tank();  // Tank control
 
 		setIntakeOp();
+		setScraperOp();
 
 		pros::delay(ez::util::DELAY_TIME);	// This is used for timer calculations!  Keep this ez::util::DELAY_TIME
 	}

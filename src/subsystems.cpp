@@ -1,11 +1,20 @@
 #include "main.h"  // IWYU pragma: keep
+#include "pros/misc.h"
+#include "pros/misc.hpp"
 
 // Internal targets to aid tasks
 Colors allianceColor = Colors::NEUTRAL;
 Colors matchColor = allianceColor;
-int intakeTarget = 0;
-int sortTarget = 0;
+int firstTarget = 0;
+int sorterTarget = 0;
+int indexerTarget = 0;
 bool inputLock = false;
+bool jamDelay = false;
+
+// Complex motors
+Jammable first = Jammable(&intakeFirst, &firstTarget, 20, 60, true, false);
+Jammable sorter = Jammable(&intakeSorter, &sorterTarget, 20, 50, false, false);
+Jammable indexer = Jammable(&intakeIndexer, &indexerTarget, 20, 100, true, false);
 
 //
 // Wrappers
@@ -13,17 +22,30 @@ bool inputLock = false;
 
 void setIntake(int first_speed, int second_speed, int third_speed) {
 	if(autonMode != AutonMode::BRAIN) {
-		intakeFirst.move(first_speed);
-		intakeSorter.move(second_speed);
-		intakeIndexer.move(third_speed);
-		intakeTarget = second_speed;
-		sortTarget = third_speed;
+		if(first.lock != true) {
+			first.motor->move(first_speed);
+		}
+		if(sorter.lock != true) {
+			sorter.motor->move(second_speed);
+		}
+		if(indexer.lock != true) {
+			indexer.motor->move(third_speed);
+		}
+		firstTarget = first_speed;
+		sorterTarget = second_speed;
+		indexerTarget = third_speed;
 	}
 }
 
 void setIntake(int intake_speed, int outtake_speed) { setIntake(intake_speed, intake_speed, outtake_speed); }
 
 void setIntake(int speed) { setIntake(speed, speed, speed); }
+
+void setScraper(bool state) {
+	if(autonMode != AutonMode::BRAIN) {
+		scraper.set(state);
+	}
+}
 
 void setAlliance(Colors alliance) {
 	allianceColor = alliance;
@@ -39,30 +61,41 @@ void sendHaptic(string input) { controllerInput = input; }
 bool shift() { return master.get_digital(pros::E_CONTROLLER_DIGITAL_R2); }
 
 void setIntakeOp() {
+	if(master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_L1) || master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_R1) ||
+	   master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_L2))
+		jamDelay = true;
 	if(shift()) {
-		if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L1)) // sorting
-			setIntake(127, -127, 0);
-		else if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L2))
-			setIntake(-127, 0); // low goal evil scoring
-		else if(master.get_digital(pros::E_CONTROLLER_DIGITAL_R1))
-			setIntake(127, 127, -90); // mid goal scoring
+		if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L1))  // sorting
+			setIntake(127, -127, -5);
+		else if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L2))	// low goal evil scoring
+			setIntake(-127, 0);
+		else if(master.get_digital(pros::E_CONTROLLER_DIGITAL_R1))	// mid goal scoring
+			setIntake(127, -90);
 		else {
 			setIntake(0);
+			first.lock = false;
+			sorter.lock = false;
+			indexer.lock = false;
 		}
 	} else if(!inputLock) {
-		if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L1)) // stowing
-			setIntake(127, 0);
-		else if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L2)) // low goal safe scoring
+		if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L1))  // stowing
+			setIntake(127, -5);
+		else if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L2))	// low goal safe scoring
 			setIntake(-90, -127, 0);
-		else if(master.get_digital(pros::E_CONTROLLER_DIGITAL_R1)) // top goal scoring scoring
-			setIntake(127);
+		else if(master.get_digital(pros::E_CONTROLLER_DIGITAL_R1))	// top goal scoring scoring
+			setIntake(127, 90);
 		else {
 			setIntake(0);
+			first.lock = false;
+			sorter.lock = false;
+			indexer.lock = false;
 		}
 	}
 
 	if(master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_R2)) sendHaptic(".");
 }
+
+void setScraperOp() { scraper.button_toggle(master.get_digital(pros::E_CONTROLLER_DIGITAL_Y)); }
 
 //
 // Color sort
@@ -113,15 +146,70 @@ void colorTask() {
 		if(!pros::competition::is_disabled()) {
 			if(colorCompare(color) && sortTime < 10) {
 				inputLock = true;
-				intakeIndexer.move(-sortTarget);
+				intakeIndexer.move(-sorterTarget);
 				sortTime++;
 				pros::delay(100);
 			} else {
 				sortTime = 0;
 				inputLock = false;
-				intakeIndexer.move(sortTarget);
+				intakeIndexer.move(sorterTarget);
 			}
 		}
+		pros::delay(10);
+	}
+}
+
+//
+// Anti-jam
+//
+
+void Jammable::checkJam() {
+	if(this->motor->get_temperature() > this->maxTemp) {
+		// cout << "Temperature too high: " << this->motor->get_temperature() << " °C\n";
+		return;
+	}
+
+	if(this->ignoreSort == false && inputLock == true) {
+		// cout << "Input locked\n";
+		return;
+	}
+
+	// cout << "target: " << abs(*(this->target)) << ", " << "actual: " << this->motor->get_actual_velocity() << "limit: " << this->limit << "\n";
+
+	if(abs(*(this->target)) > 0 && abs(this->motor->get_actual_velocity()) < this->limit) {
+		this->clock++;
+		cout << this->clock << "\n";
+		if(this->clock > 50) {
+			if(this->pause) {
+				this->lock = true;
+				this->motor->move(0);
+				// cout << "Paused\n";
+			} else {
+				this->lock = true;
+				this->motor->move(-(*(this->target)));
+				pros::delay(100);
+				this->motor->move(*(this->target));
+				this->lock = false;
+				// cout << "Unjammed\n";
+			}
+			this->clock = 0;
+		}
+	} else {
+		this->clock = 0;
+		// cout << "Jam resolved\n";
+	}
+}
+
+void antiJamTask() {
+	while(true) {
+		if(jamDelay) {
+			pros::delay(200);
+			jamDelay = false;
+		}
+		first.checkJam();
+		sorter.checkJam();
+		indexer.checkJam();
+		// cout << "====================\n";
 		pros::delay(10);
 	}
 }
@@ -140,9 +228,9 @@ void controllerTask() {
 		if(!pros::competition::is_autonomous() && !pros::competition::is_disabled()) {
 			if(pattern == "") {
 				if(timer == 475)
-					pattern = ""; // "- -"
+					pattern = "";  // "- -"
 				else if(timer >= 500 && timer < 525)
-					pattern = ""; // "."
+					pattern = "";  // "."
 				else
 					pattern = controllerInput;
 			}
@@ -153,28 +241,33 @@ void controllerTask() {
 			}
 			timer++;
 		}
-		pros::delay(100);
+		pros::delay(50);
 
 		// Update temperature variables and print to controller
 		tempDrive = (chassis.left_motors[0].get_temperature() + chassis.left_motors[1].get_temperature() + chassis.left_motors[2].get_temperature() +
 					 chassis.right_motors[0].get_temperature() + chassis.right_motors[1].get_temperature() + chassis.right_motors[2].get_temperature()) /
 					6;
-		tempIntake = (intakeFirst.get_temperature(0) + intakeFirst.get_temperature(1) + intakeSorter.get_temperature() + intakeIndexer.get_temperature()) / 4;
+		tempIntake = (intakeFirst.get_temperature() + intakeSorter.get_temperature() + intakeIndexer.get_temperature()) / 3;
 
 		if(tempDrive <= 30)
-			pros::c::controller_print(pros::E_CONTROLLER_MASTER, 0, 0, "drive: cool, %.0f°C", tempDrive);
+			pros::c::controller_print(pros::E_CONTROLLER_MASTER, 0, 0, "drive: cool, %.0f°C     ", tempDrive);
 		else if(tempDrive > 30 && tempDrive <= 50)
-			pros::c::controller_print(pros::E_CONTROLLER_MASTER, 0, 0, "drive: warm, %.0f°C", tempDrive);
+			pros::c::controller_print(pros::E_CONTROLLER_MASTER, 0, 0, "drive: warm, %.0f°C     ", tempDrive);
 		else if(tempDrive > 50)
-			pros::c::controller_print(pros::E_CONTROLLER_MASTER, 0, 0, "drive: hot, %.0f°C", tempDrive);
+			pros::c::controller_print(pros::E_CONTROLLER_MASTER, 0, 0, "drive: hot, %.0f°C     ", tempDrive);
 		pros::delay(50);
 
 		if(tempIntake <= 30)
-			pros::c::controller_print(pros::E_CONTROLLER_MASTER, 1, 0, "intke: cool, %.0f°C", tempIntake);
+			pros::c::controller_print(pros::E_CONTROLLER_MASTER, 1, 0, "intke: cool, %.0f°C     ", tempIntake);
 		else if(tempIntake > 30 && tempIntake <= 50)
-			pros::c::controller_print(pros::E_CONTROLLER_MASTER, 1, 0, "intke: warm, %.0f°C", tempIntake);
+			pros::c::controller_print(pros::E_CONTROLLER_MASTER, 1, 0, "intke: warm, %.0f°C     ", tempIntake);
 		else if(tempIntake > 50)
-			pros::c::controller_print(pros::E_CONTROLLER_MASTER, 1, 0, "intke: hot, %.0f°C", tempIntake);
+			pros::c::controller_print(pros::E_CONTROLLER_MASTER, 1, 0, "intke: hot, %.0f°C     ", tempIntake);
+		pros::delay(50);
+
+		// Print selected auton to controller
+		if(!(!pros::competition::is_autonomous() && !pros::competition::is_disabled()))
+			pros::c::controller_print(pros::E_CONTROLLER_MASTER, 2, 0, (auton_sel.selector_name + "        ").c_str());
 		pros::delay(50);
 	}
 }

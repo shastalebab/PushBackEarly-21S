@@ -67,7 +67,7 @@ void resetViewer(bool full) {
 		autonMode = AutonMode::BRAIN;
 		autonPath = {};
 		auton_sel.selector_callback();
-		pathDisplay = injectPath(autonPath, 1);
+		pathDisplay = injectPath(autonPath, .5);
 		autonMode = preference;
 		lv_img_set_src(autonField, &(matchColor == Colors::BLUE ? blue_alliance : red_alliance));
 	}
@@ -82,11 +82,11 @@ void pathViewerTask() {
 			if(pathIter < pathDisplay.size() - 1) {
 				lv_img_set_angle(autonRobot, 10 * (pathDisplay[pathIter].t));
 				if(pathDisplay[pathIter].left == KEY)
-					pros::delay(pathDisplay[pathIter].right);
+					pros::delay(pathDisplay[pathIter].right - 10);
 				else {
-					double velocity = getVelocity(pathDisplay[pathIter].left) + getVelocity(pathDisplay[pathIter].right) / 2;
+					double velocity = (getVelocity(pathDisplay[pathIter].left) + getVelocity(pathDisplay[pathIter].right)) / 2;
 					if(velocity == 0) velocity = getVelocity(pathDisplay[pathIter].left);
-					pros::delay(1000 * abs(getTimeToPoint(1, velocity)));
+					pros::delay((1000 * abs(getTimeToPoint(.5, velocity))) - 10);
 				}
 			}
 			if(pathIter == 1) pros::delay(500);
@@ -173,6 +173,7 @@ static void selectAuton(lv_event_t* e) {
 	lv_obj_set_style_img_recolor(colorOverlay, lv_color_darken((*getAuton).color, 80), LV_PART_MAIN);
 	lv_obj_set_style_img_recolor(allianceOverlay, lv_color_darken((*getAuton).color, 80), LV_PART_MAIN);
 	auton_sel.selector_callback = (*getAuton).callback;
+	auton_sel.selector_name = (*getAuton).name;
 	resetViewer(true);
 }
 
