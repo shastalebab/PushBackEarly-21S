@@ -1,6 +1,6 @@
 #include "main.h"  // IWYU pragma: keep
 
-AutonMode autonMode = AutonMode::DRIVER;
+AutonMode autonMode = BRAIN;
 Coordinate currentPoint = {0, 0, 0};
 vector<Coordinate> autonPath = {};
 
@@ -139,7 +139,7 @@ void setPosition(double x, double y, double t) {
 	currentPoint.x = x;
 	currentPoint.y = y;
 	currentPoint.t = t;
-	if(autonMode != AutonMode::BRAIN) chassis.odom_xyt_set(currentPoint.x, currentPoint.y, t);
+	if(autonMode != BRAIN) chassis.odom_xyt_set(currentPoint.x, currentPoint.y, t);
 	autonPath.push_back(currentPoint);
 }
 
@@ -149,13 +149,13 @@ void setPosition(double x, double y, double t) {
 
 void pidWait(Wait type) {
 	switch(autonMode) {
-		case AutonMode::PLAIN:
-		case AutonMode::ODOM:
+		case PLAIN:
+		case ODOM:
 			switch(type) {
-				case Wait::QUICK:
+				case QUICK:
 					chassis.pid_wait_quick();
 					break;
-				case Wait::CHAIN:
+				case CHAIN:
 					chassis.pid_wait_quick_chain();
 					break;
 				default:
@@ -170,8 +170,8 @@ void pidWait(Wait type) {
 
 void pidWaitUntil(okapi::QLength distance) {
 	switch(autonMode) {
-		case AutonMode::PLAIN:
-		case AutonMode::ODOM:
+		case PLAIN:
+		case ODOM:
 			chassis.pid_wait_until(distance);
 			break;
 		default:
@@ -181,8 +181,8 @@ void pidWaitUntil(okapi::QLength distance) {
 
 void pidWaitUntil(okapi::QAngle theta) {
 	switch(autonMode) {
-		case AutonMode::PLAIN:
-		case AutonMode::ODOM:
+		case PLAIN:
+		case ODOM:
 			chassis.pid_wait_until(theta);
 			break;
 		default:
@@ -192,8 +192,8 @@ void pidWaitUntil(okapi::QAngle theta) {
 
 void pidWaitUntil(Coordinate coordinate) {
 	switch(autonMode) {
-		case AutonMode::PLAIN:
-		case AutonMode::ODOM:
+		case PLAIN:
+		case ODOM:
 			chassis.pid_wait_until({coordinate.x * okapi::inch, coordinate.y * okapi::inch});
 			break;
 		default:
@@ -203,8 +203,8 @@ void pidWaitUntil(Coordinate coordinate) {
 
 void delayMillis(int millis, bool ignore) {
 	switch(autonMode) {
-		case AutonMode::PLAIN:
-		case AutonMode::ODOM:
+		case PLAIN:
+		case ODOM:
 			pros::delay(millis);
 			break;
 		default:
@@ -228,7 +228,7 @@ void delayMillis(int millis) {
 void moveToPoint(Coordinate newpoint, drive_directions direction, int speed) {
 	bool slew_state = false;
 	switch(autonMode) {
-		case AutonMode::ODOM:
+		case ODOM:
 			chassis.pid_odom_set({{newpoint.x * okapi::inch, newpoint.y * okapi::inch}, direction, speed});
 			currentPoint.t = getTheta({currentPoint.x, currentPoint.y}, newpoint, direction);
 			currentPoint.x = newpoint.x;
@@ -239,7 +239,7 @@ void moveToPoint(Coordinate newpoint, drive_directions direction, int speed) {
 			break;
 		default:
 			turnSet(getTheta(currentPoint, newpoint, direction), speed);
-			pidWait(Wait::CHAIN);
+			pidWait(CHAIN);
 			driveSet((getDistance(currentPoint, newpoint) * (direction == rev ? -1 : 1)), speed);
 			break;
 	}
@@ -252,12 +252,12 @@ void moveToPoint(Coordinate newpoint, drive_directions direction, int speed) {
 void driveSet(double distance, int speed, bool slew) {
 	drive_directions direction = distance < 0 ? rev : fwd;
 	switch(autonMode) {
-		case AutonMode::PLAIN:
+		case PLAIN:
 			chassis.pid_drive_set(distance * okapi::inch, speed, false);
 			currentPoint.x = chassis.odom_x_get();
 			currentPoint.y = chassis.odom_y_get();
 			break;
-		case AutonMode::ODOM:
+		case ODOM:
 			chassis.pid_odom_set(distance * okapi::inch, speed, false);
 			currentPoint.x = chassis.odom_x_get();
 			currentPoint.y = chassis.odom_y_get();
@@ -282,8 +282,8 @@ void driveSet(double distance, int speed) {
 
 void turnSet(double theta, int speed, e_angle_behavior behavior) {
 	switch(autonMode) {
-		case AutonMode::PLAIN:
-		case AutonMode::ODOM:
+		case PLAIN:
+		case ODOM:
 			chassis.pid_turn_set(theta * okapi::degree, speed, behavior);
 			break;
 		default:
@@ -304,8 +304,8 @@ void turnSet(double theta, int speed, e_angle_behavior behavior) {
 void turnSet(double theta, int speed) {
 	e_angle_behavior behavior = (util::turn_shortest(theta, currentPoint.t) < currentPoint.t) ? ccw : cw;
 	switch(autonMode) {
-		case AutonMode::PLAIN:
-		case AutonMode::ODOM:
+		case PLAIN:
+		case ODOM:
 			behavior = (util::turn_shortest(theta, chassis.odom_theta_get()) < chassis.odom_theta_get()) ? ccw : cw;
 			break;
 		default:
@@ -317,8 +317,8 @@ void turnSet(double theta, int speed) {
 void turnSet(Coordinate point, drive_directions direction, int speed, e_angle_behavior behavior) {
 	double theta = getTheta(currentPoint, point, direction);
 	switch(autonMode) {
-		case AutonMode::PLAIN:
-		case AutonMode::ODOM:
+		case PLAIN:
+		case ODOM:
 			theta = getTheta({chassis.odom_x_get(), chassis.odom_y_get(), chassis.odom_theta_get()}, point, direction);
 			break;
 		default:
@@ -331,8 +331,8 @@ void turnSet(Coordinate point, drive_directions direction, int speed) {
 	double theta = getTheta(currentPoint, point, direction);
 	e_angle_behavior behavior = (util::turn_shortest(theta, currentPoint.t) < currentPoint.t) ? ccw : cw;
 	switch(autonMode) {
-		case AutonMode::PLAIN:
-		case AutonMode::ODOM:
+		case PLAIN:
+		case ODOM:
 			behavior = (util::turn_shortest(theta, chassis.odom_theta_get()) < chassis.odom_theta_get()) ? ccw : cw;
 			theta = getTheta({chassis.odom_x_get(), chassis.odom_y_get(), chassis.odom_theta_get()}, point, direction);
 			break;
@@ -344,8 +344,8 @@ void turnSet(Coordinate point, drive_directions direction, int speed) {
 
 void turnSetRelative(double theta, int speed, e_angle_behavior behavior) {
 	switch(autonMode) {
-		case AutonMode::PLAIN:
-		case AutonMode::ODOM:
+		case PLAIN:
+		case ODOM:
 			theta += chassis.odom_theta_get();
 			break;
 		default:
@@ -360,8 +360,8 @@ void turnSetRelative(double theta, int speed, e_angle_behavior behavior) {
 void turnSetRelative(double theta, int speed) {
 	e_angle_behavior behavior = (util::turn_shortest(theta, currentPoint.t) < 0) ? ccw : cw;
 	switch(autonMode) {
-		case AutonMode::PLAIN:
-		case AutonMode::ODOM:
+		case PLAIN:
+		case ODOM:
 			behavior = (util::turn_shortest(theta, chassis.odom_theta_get()) < 0) ? ccw : cw;
 			theta += chassis.odom_theta_get();
 			break;
@@ -380,8 +380,8 @@ void turnSetRelative(double theta, int speed) {
 
 void swingSet(e_swing side, double theta, double main, double opp, e_angle_behavior behavior) {
 	switch(autonMode) {
-		case AutonMode::PLAIN:
-		case AutonMode::ODOM:
+		case PLAIN:
+		case ODOM:
 			chassis.pid_swing_set(side, theta * okapi::degree, main, opp, behavior);
 			break;
 		default:
@@ -417,8 +417,8 @@ void swingSet(ez::e_swing side, double theta, double main, ez::e_angle_behavior 
 void swingSet(ez::e_swing side, double theta, double main, double opp) {
 	e_angle_behavior behavior = (util::turn_shortest(theta, currentPoint.t) < 0) ? ccw : cw;
 	switch(autonMode) {
-		case AutonMode::PLAIN:
-		case AutonMode::ODOM:
+		case PLAIN:
+		case ODOM:
 			behavior = (util::turn_shortest(theta, chassis.odom_theta_get()) < 0) ? ccw : cw;
 			break;
 		default:
@@ -430,8 +430,8 @@ void swingSet(ez::e_swing side, double theta, double main, double opp) {
 void swingSet(ez::e_swing side, double theta, double main) {
 	e_angle_behavior behavior = (util::turn_shortest(theta, currentPoint.t) < 0) ? ccw : cw;
 	switch(autonMode) {
-		case AutonMode::PLAIN:
-		case AutonMode::ODOM:
+		case PLAIN:
+		case ODOM:
 			behavior = (util::turn_shortest(theta, chassis.odom_theta_get()) < 0) ? ccw : cw;
 			break;
 		default:

@@ -8,10 +8,11 @@ extern Drive chassis;
 
 // Your motors, sensors, etc. should go here.  Below are examples
 
-inline pros::Optical colorSens(1);
+inline pros::Optical colorSens(2);
+inline pros::Optical proximitySens(3);
 
 inline pros::Motor intakeFirst(4);
-inline pros::Motor intakeSorter(5);
+inline pros::Motor intakeSorter(-5);
 inline pros::Motor intakeHoarder(6);
 inline pros::Motor intakeIndexer(7);
 inline ez::Piston scraper('A');
@@ -24,6 +25,7 @@ class Jammable {
 	pros::Motor* motor;
 	int* target;
 	int limit;
+	int attempts;
 	float maxTemp;
 	bool ignoreSort;
 	bool pause;
@@ -35,14 +37,16 @@ class Jammable {
 		motor = &intakeFirst;
 		target = 0;
 		limit = 4;
+		attempts = 20;
 		maxTemp = 55;
 		ignoreSort = true;
 		pause = false;
         lock = false;
 	}
-	Jammable(pros::Motor* Motor, int* Target, int Limit, float MaxTemp, bool IgnoreSort, bool Pause) {
+	Jammable(pros::Motor* Motor, int* Target, int Limit, int Attempts, float MaxTemp, bool IgnoreSort, bool Pause) {
         motor = Motor;
 		target = Target;
+		attempts = Attempts;
 		limit = Limit;
 		maxTemp = MaxTemp;
 		ignoreSort = IgnoreSort;

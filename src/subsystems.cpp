@@ -1,7 +1,7 @@
 #include "main.h"  // IWYU pragma: keep
 
 // Internal targets to aid tasks
-Colors allianceColor = Colors::NEUTRAL;
+Colors allianceColor = NEUTRAL;
 Colors matchColor = allianceColor;
 int firstTarget = 0;
 int sorterTarget = 0;
@@ -11,17 +11,17 @@ bool inputLock = false;
 bool jamDelay = false;
 
 // Complex motors
-Jammable first = Jammable(&intakeFirst, &firstTarget, 20, 60, true, false);
-Jammable sorter = Jammable(&intakeSorter, &sorterTarget, 20, 50, false, false);
-Jammable hoarder = Jammable(&intakeHoarder, &hoarderTarget, 20, 50, true, false);
-Jammable indexer = Jammable(&intakeIndexer, &indexerTarget, 20, 100, true, false);
+Jammable first = Jammable(&intakeFirst, &firstTarget, 20, 50, 60, true, false);
+Jammable sorter = Jammable(&intakeSorter, &sorterTarget, 20, 50, 50, false, false);
+Jammable hoarder = Jammable(&intakeHoarder, &hoarderTarget, 20, 20, 50, true, false);
+Jammable indexer = Jammable(&intakeIndexer, &indexerTarget, 20, 20, 100, true, false);
 
 //
 // Wrappers
 //
 
 void setIntake(int first_speed, int second_speed, int third_speed, int fourth_speed) {
-	if(autonMode != AutonMode::BRAIN) {
+	if(autonMode != BRAIN) {
 		if(first.lock != true) {
 			first.motor->move(first_speed);
 		}
@@ -48,7 +48,7 @@ void setIntake(int intake_speed, int outtake_speed) { setIntake(intake_speed, in
 void setIntake(int speed) { setIntake(speed, speed, speed, speed); }
 
 void setScraper(bool state) {
-	if(autonMode != AutonMode::BRAIN) {
+	if(autonMode != BRAIN) {
 		scraper.set(state);
 	}
 }
@@ -74,9 +74,9 @@ void setIntakeOp() {
 		if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L1))  // sorting
 			setIntake(127, 0, 0);
 		else if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L2))	// low goal evil scoring
-			setIntake(-127, 127, -127);
+			setIntake(-127, -30, 127, -127);
 		else if(master.get_digital(pros::E_CONTROLLER_DIGITAL_R1))	// mid goal scoring
-			setIntake(127, -127);
+			setIntake(60, -127, 127, -8);
 		else {
 			setIntake(0);
 			first.lock = false;
@@ -85,14 +85,17 @@ void setIntakeOp() {
 			indexer.lock = false;
 		}
 	} else if(!inputLock) {
-		if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L1))  // stowing
-			setIntake(127, 127, -127, 127);
-		else if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L2))	// low goal safe scoring
-			setIntake(-90, 127, -127);
-		else if(master.get_digital(pros::E_CONTROLLER_DIGITAL_R1))	// top goal scoring scoring
+		if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L1)) {	 // stowing
 			setIntake(127);
-		else {
+		} else if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L2)) {	// low goal safe scoring
+			setIntake(-50, -50, 90, 0);
+			first.limit = 5;
+		} else if(master.get_digital(pros::E_CONTROLLER_DIGITAL_R1)) {	// top goal scoring scoring
+			setIntake(127, -127, 127, 127);
+		} else {
 			setIntake(0);
+
+			first.limit = 20;
 			first.lock = false;
 			sorter.lock = false;
 			hoarder.lock = false;
@@ -111,7 +114,7 @@ void setScraperOp() { scraper.button_toggle(master.get_digital(pros::E_CONTROLLE
 
 void colorToggle() {
 	if(allianceColor == matchColor)
-		allianceColor = Colors::NEUTRAL;
+		allianceColor = NEUTRAL;
 	else
 		allianceColor = matchColor;
 }
@@ -119,23 +122,23 @@ void colorToggle() {
 void colorSet(Colors color, lv_obj_t* object) {
 	// Set on screen elements to the corresponding color
 	lv_color32_t color_use = theme_accent;
-	if(color == Colors::RED)
+	if(color == RED)
 		color_use = red;
-	else if(color == Colors::BLUE)
+	else if(color == BLUE)
 		color_use = blue;
 	lv_obj_set_style_bg_color(object, color_use, LV_PART_MAIN);
 }
 
 Colors colorGet() {
 	double hue = 0;
-	if(colorSens.get_proximity() > 100) {
+	if(proximitySens.get_proximity() > 100) {
 		hue = colorSens.get_hue();
 		if((hue > 340 && hue < 360) || (hue > 0 && hue < 20))
-			return Colors::RED;
+			return RED;
 		else if(hue > 210 && hue < 240)
-			return Colors::BLUE;
+			return BLUE;
 	}
-	return Colors::NEUTRAL;
+	return NEUTRAL;
 }
 
 bool colorCompare(Colors color) {
@@ -146,21 +149,29 @@ bool colorCompare(Colors color) {
 void colorTask() {
 	Colors color;
 	int sortTime = 0;
+	bool sleep = false;
 	colorSens.set_integration_time(10);
+	proximitySens.set_integration_time(10);
 	colorSens.set_led_pwm(100);
+	proximitySens.set_led_pwm(100);
 	while(true) {
 		color = colorGet();
 		colorSet(color, colorInd);
 		if(!pros::competition::is_disabled()) {
-			if(colorCompare(color) && sortTime < 10) {
-				inputLock = true;
-				intakeIndexer.move(-sorterTarget);
-				sortTime++;
-				pros::delay(100);
+			if(colorCompare(color) && !sleep) {
+				if(sortTime < 10) {
+					inputLock = true;
+					intakeSorter.move(-(util::sgn(sorterTarget)) * 10);
+					sortTime++;
+					pros::delay(100);
+				} else {
+					sleep = true;
+					intakeSorter.move(sorterTarget);
+				}
 			} else {
 				sortTime = 0;
+				sleep = false;
 				inputLock = false;
-				intakeIndexer.move(sorterTarget);
 			}
 		}
 		pros::delay(10);
@@ -182,12 +193,12 @@ void Jammable::checkJam() {
 		return;
 	}
 
-	// cout << "target: " << abs(*(this->target)) << ", " << "actual: " << this->motor->get_actual_velocity() << "limit: " << this->limit << "\n";
+	// cout << "target: " << abs(*(this->target)) << ", " << "actual: " << this->motor->get_actual_velocity() << " limit: " << this->limit << "\n";
 
 	if(abs(*(this->target)) > 0 && abs(this->motor->get_actual_velocity()) < this->limit) {
 		this->clock++;
 		cout << this->clock << "\n";
-		if(this->clock > 50) {
+		if(this->clock > this->attempts) {
 			if(this->pause) {
 				this->lock = true;
 				this->motor->move(0);
@@ -216,6 +227,7 @@ void antiJamTask() {
 		}
 		first.checkJam();
 		sorter.checkJam();
+		hoarder.checkJam();
 		indexer.checkJam();
 		// cout << "====================\n";
 		pros::delay(10);

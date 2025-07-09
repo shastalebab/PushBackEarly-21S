@@ -1,10 +1,11 @@
 #include "main.h"
+#include "drive.hpp"
 
 // Chassis constructor
 ez::Drive chassis(
 	// These are your drive motors, the first motor is used for sensing!
-	{-16, -18, -20},  // Left Chassis Ports (negative port will reverse it!)
-	{9, 8, 10},	   // Right Chassis Ports (negative port will reverse it!)
+	{-1, -19, -20},  // Left Chassis Ports (negative port will reverse it!)
+	{8, 9, 10},	   // Right Chassis Ports (negative port will reverse it!)
 
 	7,				// IMU Port
 	WHEEL_DIAMETER,	// Wheel Diameter (Remember, 4" wheels without screw holes are actually 4.125!)
@@ -49,7 +50,7 @@ void disabled() {
 }
 
 void competition_initialize() { 
-	autonMode = AutonMode::BRAIN;
+	autonMode = BRAIN;
  }
 
 void autonomous() {
@@ -59,14 +60,14 @@ void autonomous() {
 	chassis.odom_xyt_set(0_in, 0_in, 0_deg);	// Set the current position, you can start at a specific position with this
 	chassis.drive_brake_set(MOTOR_BRAKE_HOLD);	// Set motors to hold.  This helps autonomous consistency
 
-	autonMode = AutonMode::PLAIN;
+	autonMode = PLAIN;
 	autonPath = {};
 	auton_sel.selector_callback();	// Calls selected auton from autonomous selector
 }
 
 void opcontrol() {
 	chassis.drive_brake_set(pros::E_MOTOR_BRAKE_BRAKE);
-	autonMode = AutonMode::DRIVER;
+	autonMode = PLAIN;
 
 	while(true) {
 		chassis.opcontrol_tank();  // Tank control

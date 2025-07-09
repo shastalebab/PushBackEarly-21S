@@ -64,12 +64,12 @@ vector<Coordinate> pathDisplay;
 void resetViewer(bool full) {
 	if(full) {
 		auto preference = autonMode;
-		autonMode = AutonMode::BRAIN;
+		autonMode = BRAIN;
 		autonPath = {};
 		auton_sel.selector_callback();
 		pathDisplay = injectPath(autonPath, .5);
 		autonMode = preference;
-		lv_img_set_src(autonField, &(matchColor == Colors::BLUE ? blue_alliance : red_alliance));
+		lv_img_set_src(autonField, &(matchColor == BLUE ? blue_alliance : red_alliance));
 	}
 	pathIter = 0;
 }
@@ -89,10 +89,10 @@ void pathViewerTask() {
 					pros::delay((1000 * abs(getTimeToPoint(.5, velocity))) - 10);
 				}
 			}
-			if(pathIter == 1) pros::delay(500);
+			if(pathIter == 1) pros::delay(490);
 			pathIter++;
 		} else if(pathIter >= pathDisplay.size()) {
-			pros::delay(1000);
+			pros::delay(990);
 			resetViewer(false);
 		}
 		pros::delay(10);
