@@ -7,7 +7,7 @@ ez::Drive chassis(
 	{-1, -19, -20},  // Left Chassis Ports (negative port will reverse it!)
 	{8, 9, 10},	   // Right Chassis Ports (negative port will reverse it!)
 
-	7,				// IMU Port
+	12,				// IMU Port
 	WHEEL_DIAMETER,	// Wheel Diameter (Remember, 4" wheels without screw holes are actually 4.125!)
 	450);			// Wheel RPM = cartridge * (motor gear / wheel gear)
 
@@ -42,6 +42,7 @@ void initialize() {
 	pros::Task ControllerTask(controllerTask);
 	pros::Task PathViewerTask(pathViewerTask);
 	pros::Task AngleCheckTask(angleCheckTask);
+	pros::Task MotorUpdateTask(motorUpdateTask);
 	master.rumble(chassis.drive_imu_calibrated() ? "." : "---");
 }
 
@@ -70,7 +71,7 @@ void opcontrol() {
 	autonMode = PLAIN;
 
 	while(true) {
-		chassis.opcontrol_tank();  // Tank control
+		if(!probing) chassis.opcontrol_tank();  // Tank control
 
 		setIntakeOp();
 		setScraperOp();

@@ -35,9 +35,9 @@ class Jammable {
 
 	Jammable() {
 		motor = &intakeFirst;
-		target = 0;
-		limit = 4;
+		target = nullptr;
 		attempts = 20;
+		limit = 4;
 		maxTemp = 55;
 		ignoreSort = true;
 		pause = false;

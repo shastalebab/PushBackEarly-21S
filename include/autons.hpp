@@ -1,14 +1,28 @@
 #pragma once
 
+#include "EZ-Template/api.hpp"
+
+//
+// CONSTANTS
+//
+
 void default_constants();
 
-void move_forward();
+//
+// TUNING
+//
+
+void drive_test(int inches);
+void turn_test(int degrees);
+void swing_test(int degrees);
+void heading_test(int degrees);
 
 //
 // RIGHT AUTONS
 //
 
 void right_split();
+void right_greed();
 void right_awp();
 
 //
@@ -16,4 +30,11 @@ void right_awp();
 //
 
 void left_split();
+void left_greed();
 void left_awp();
+
+//
+// SKILLS
+//
+
+void skills();

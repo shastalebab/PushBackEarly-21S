@@ -18,12 +18,13 @@ const int SWING_SPEED = 90;
 ///
 void default_constants() {
 	// P, I, D, and Start I
-	chassis.pid_drive_constants_set(20.0, 0.0, 100.0);		   // Fwd/rev constants, used for odom and non odom motions
+	chassis.pid_drive_constants_set(0.0, 0.0, 0.0);		   // Fwd/rev constants, used for odom and non odom motions
 	chassis.pid_heading_constants_set(11.0, 0.0, 25.0);		   // Holds the robot straight while going forward without odom
-	chassis.pid_turn_constants_set(3.25, 0.05, 25.0, 15.0);	   // Turn in place constants
+	chassis.pid_turn_constants_set(4.25, 2.15, 47.25, 15.0);	   // Turn in place constants
 	chassis.pid_swing_constants_set(6.0, 0.0, 65.0);		   // Swing constants
 	chassis.pid_odom_angular_constants_set(6.5, 0.0, 52.5);	   // Angular control for odom motions
 	chassis.pid_odom_boomerang_constants_set(5.8, 0.0, 32.5);  // Angular control for boomerang motions
+	chassis.pid_drive_constants_get();
 
 	// Exit conditions
 	chassis.pid_turn_exit_condition_set(90_ms, 3_deg, 250_ms, 7_deg, 500_ms, 500_ms);
@@ -51,7 +52,32 @@ void default_constants() {
 	chassis.pid_angle_behavior_set(shortest);  // Changes the default behavior for turning, this defaults it to the shortest path there
 }
 
-void move_forward() { driveSet(24, 127); }
+//
+// TUNING
+//
+
+void drive_test(int inches) {
+	chassis.pid_drive_set(inches, 127);
+	chassis.pid_wait();
+}
+
+void turn_test(int degrees) {
+	chassis.pid_turn_set(degrees, 127, raw);
+	chassis.pid_wait();
+}
+
+void swing_test(int degrees) {
+	chassis.pid_swing_set(LEFT_SWING, degrees, 127, 30, raw);
+	chassis.pid_wait();
+}
+
+void heading_test(int degrees) {
+	chassis.pid_drive_set(12, 127);
+	chassis.pid_wait_quick_chain();
+	chassis.pid_turn_set(degrees, 127, raw);
+	chassis.pid_wait_quick_chain();
+	chassis.pid_drive_set(12, 127);
+}
 
 //
 // RIGHT AUTONS
@@ -98,6 +124,8 @@ void right_split() {
 	pidWait(WAIT);
 	setIntake(127, -127);
 }
+
+void right_greed() {}
 
 void right_awp() {
 	setPosition(83.44, 18.86, 45);
@@ -181,6 +209,8 @@ void left_split() {
 	setIntake(127, -127);
 }
 
+void left_greed() {}
+
 void left_awp() {
 	setPosition(60.56, 18.86, -45);
 	// Approach bottom goal
@@ -224,3 +254,9 @@ void left_awp() {
 	pidWait(WAIT);
 	setIntake(127);
 }
+
+//
+// SKILLS
+//
+
+void skills() {}

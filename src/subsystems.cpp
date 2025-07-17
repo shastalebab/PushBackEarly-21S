@@ -71,28 +71,28 @@ void setIntakeOp() {
 	   master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_L2))
 		jamDelay = true;
 	if(shift()) {
-		if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L1))  // sorting
-			setIntake(127, 0, 0);
+		if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L1) && !inputLock)	 // sorting
+			setIntake(127, -127, -127, 127);
 		else if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L2))	// low goal evil scoring
-			setIntake(-127, -30, 127, -127);
+			setIntake(-127, -127, 127, 0);
 		else if(master.get_digital(pros::E_CONTROLLER_DIGITAL_R1))	// mid goal scoring
-			setIntake(60, -127, 127, -8);
-		else {
+			setIntake(35, -127, 127, -35);
+		else if(!inputLock) {
 			setIntake(0);
 			first.lock = false;
 			sorter.lock = false;
 			hoarder.lock = false;
 			indexer.lock = false;
 		}
-	} else if(!inputLock) {
-		if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L1)) {	 // stowing
+	} else {
+		if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L1) && !inputLock) {  // stowing
 			setIntake(127);
 		} else if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L2)) {	// low goal safe scoring
-			setIntake(-50, -50, 90, 0);
+			setIntake(-127, -30, 127, 0);
 			first.limit = 5;
 		} else if(master.get_digital(pros::E_CONTROLLER_DIGITAL_R1)) {	// top goal scoring scoring
 			setIntake(127, -127, 127, 127);
-		} else {
+		} else if(!inputLock) {
 			setIntake(0);
 
 			first.limit = 20;
@@ -135,7 +135,7 @@ Colors colorGet() {
 		hue = colorSens.get_hue();
 		if((hue > 340 && hue < 360) || (hue > 0 && hue < 20))
 			return RED;
-		else if(hue > 210 && hue < 240)
+		else if(hue > 210 && hue < 300)
 			return BLUE;
 	}
 	return NEUTRAL;
@@ -153,7 +153,6 @@ void colorTask() {
 	colorSens.set_integration_time(10);
 	proximitySens.set_integration_time(10);
 	colorSens.set_led_pwm(100);
-	proximitySens.set_led_pwm(100);
 	while(true) {
 		color = colorGet();
 		colorSet(color, colorInd);
@@ -161,7 +160,7 @@ void colorTask() {
 			if(colorCompare(color) && !sleep) {
 				if(sortTime < 10) {
 					inputLock = true;
-					intakeSorter.move(-(util::sgn(sorterTarget)) * 10);
+					intakeSorter.move(-(util::sgn(sorterTarget)) * 80);
 					sortTime++;
 					pros::delay(100);
 				} else {
@@ -243,51 +242,107 @@ void controllerTask() {
 	int timer = 0;
 	float tempDrive;
 	float tempIntake;
+	int selected_k = 0;
 	while(true) {
-		// Update timer and rumble controller
-		if(!pros::competition::is_autonomous() && !pros::competition::is_disabled()) {
-			if(pattern == "") {
-				if(timer == 475)
-					pattern = "";  // "- -"
-				else if(timer >= 500 && timer < 525)
-					pattern = "";  // "."
-				else
-					pattern = controllerInput;
+		if(lv_tileview_get_tile_act(main_tv) == pidTuner && !pros::competition::is_competition_switch()) {
+			PID::Constants constants = selectedTabObj->pid_targets.pid->constants_get();
+
+			if(master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_LEFT)) {
+				selected_k++;
+				selected_k %= 3;
+			} else if(master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_DOWN)) {
+				pros::c::controller_clear(pros::E_CONTROLLER_MASTER);
+				pros::delay(50);
+				pros::c::controller_print(pros::E_CONTROLLER_MASTER, 1, 0, "%s      ", selectedTabObj->name.c_str());
+				pros::delay(2000);
+			} else if(master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_UP)) {
+				lv_event_send(selectedTabObj->graph, LV_EVENT_CLICKED, NULL);
+			} else {
+				if(master.get_digital(pros::E_CONTROLLER_DIGITAL_A)) {
+					switch(selected_k) {
+						default:
+						case 0:
+							constants.kp += selectedTabObj->pid_targets.kp;
+							break;
+						case 1:
+							constants.ki += selectedTabObj->pid_targets.ki;
+							break;
+						case 2:
+							constants.kd += selectedTabObj->pid_targets.kd;
+							break;
+					}
+				} else if(master.get_digital(pros::E_CONTROLLER_DIGITAL_B)) {
+					switch(selected_k) {
+						default:
+						case 0:
+							constants.kp -= selectedTabObj->pid_targets.kp;
+							if(constants.kp < 0) constants.kp = 0;
+							break;
+						case 1:
+							constants.ki -= selectedTabObj->pid_targets.ki;
+							if(constants.ki < 0) constants.ki = 0;
+							break;
+						case 2:
+							constants.kd -= selectedTabObj->pid_targets.kd;
+							if(constants.kd < 0) constants.kd = 0;
+							break;
+					}
+				}
 			}
-			if(timer % 5 == 0 || controllerInput != "") {
-				master.rumble(pattern.c_str());
-				controllerInput = "";
-				pattern = "";
+
+			selectedTabObj->pid_targets.pid->constants_set(constants.kp, constants.ki, constants.kd);
+
+			pros::c::controller_print(pros::E_CONTROLLER_MASTER, 0, 0, "%c kp: %.2f     ", selected_k == 0 ? '>' : ' ', constants.kp);
+			pros::delay(50);
+			pros::c::controller_print(pros::E_CONTROLLER_MASTER, 1, 0, "%c ki: %.2f     ", selected_k == 1 ? '>' : ' ', constants.ki);
+			pros::delay(50);
+			pros::c::controller_print(pros::E_CONTROLLER_MASTER, 2, 0, "%c kd: %.2f     ", selected_k == 2 ? '>' : ' ', constants.kd);
+		} else {
+			// Update timer and rumble controller
+			if(!pros::competition::is_autonomous() && !pros::competition::is_disabled()) {
+				if(pattern == "") {
+					if(timer == 475)
+						pattern = "";  // "- -"
+					else if(timer >= 500 && timer < 525)
+						pattern = "";  // "."
+					else
+						pattern = controllerInput;
+				}
+				if(timer % 5 == 0 || controllerInput != "") {
+					master.rumble(pattern.c_str());
+					controllerInput = "";
+					pattern = "";
+				}
+				timer++;
 			}
-			timer++;
+			pros::delay(50);
+
+			// Update temperature variables and print to controller
+			tempDrive = (chassis.left_motors[0].get_temperature() + chassis.left_motors[1].get_temperature() + chassis.left_motors[2].get_temperature() +
+						 chassis.right_motors[0].get_temperature() + chassis.right_motors[1].get_temperature() + chassis.right_motors[2].get_temperature()) /
+						6;
+			tempIntake = (intakeFirst.get_temperature() + intakeSorter.get_temperature() + intakeIndexer.get_temperature()) / 3;
+
+			if(tempDrive <= 30)
+				pros::c::controller_print(pros::E_CONTROLLER_MASTER, 0, 0, "drive: cool, %.0f°C     ", tempDrive);
+			else if(tempDrive > 30 && tempDrive <= 50)
+				pros::c::controller_print(pros::E_CONTROLLER_MASTER, 0, 0, "drive: warm, %.0f°C     ", tempDrive);
+			else if(tempDrive > 50)
+				pros::c::controller_print(pros::E_CONTROLLER_MASTER, 0, 0, "drive: hot, %.0f°C     ", tempDrive);
+			pros::delay(50);
+
+			if(tempIntake <= 30)
+				pros::c::controller_print(pros::E_CONTROLLER_MASTER, 1, 0, "intke: cool, %.0f°C     ", tempIntake);
+			else if(tempIntake > 30 && tempIntake <= 50)
+				pros::c::controller_print(pros::E_CONTROLLER_MASTER, 1, 0, "intke: warm, %.0f°C     ", tempIntake);
+			else if(tempIntake > 50)
+				pros::c::controller_print(pros::E_CONTROLLER_MASTER, 1, 0, "intke: hot, %.0f°C     ", tempIntake);
+			pros::delay(50);
+
+			// Print selected auton to controller
+			if(!(!pros::competition::is_autonomous() && !pros::competition::is_disabled()))
+				pros::c::controller_print(pros::E_CONTROLLER_MASTER, 2, 0, (auton_sel.selector_name + "        ").c_str());
 		}
-		pros::delay(50);
-
-		// Update temperature variables and print to controller
-		tempDrive = (chassis.left_motors[0].get_temperature() + chassis.left_motors[1].get_temperature() + chassis.left_motors[2].get_temperature() +
-					 chassis.right_motors[0].get_temperature() + chassis.right_motors[1].get_temperature() + chassis.right_motors[2].get_temperature()) /
-					6;
-		tempIntake = (intakeFirst.get_temperature() + intakeSorter.get_temperature() + intakeIndexer.get_temperature()) / 3;
-
-		if(tempDrive <= 30)
-			pros::c::controller_print(pros::E_CONTROLLER_MASTER, 0, 0, "drive: cool, %.0f°C     ", tempDrive);
-		else if(tempDrive > 30 && tempDrive <= 50)
-			pros::c::controller_print(pros::E_CONTROLLER_MASTER, 0, 0, "drive: warm, %.0f°C     ", tempDrive);
-		else if(tempDrive > 50)
-			pros::c::controller_print(pros::E_CONTROLLER_MASTER, 0, 0, "drive: hot, %.0f°C     ", tempDrive);
-		pros::delay(50);
-
-		if(tempIntake <= 30)
-			pros::c::controller_print(pros::E_CONTROLLER_MASTER, 1, 0, "intke: cool, %.0f°C     ", tempIntake);
-		else if(tempIntake > 30 && tempIntake <= 50)
-			pros::c::controller_print(pros::E_CONTROLLER_MASTER, 1, 0, "intke: warm, %.0f°C     ", tempIntake);
-		else if(tempIntake > 50)
-			pros::c::controller_print(pros::E_CONTROLLER_MASTER, 1, 0, "intke: hot, %.0f°C     ", tempIntake);
-		pros::delay(50);
-
-		// Print selected auton to controller
-		if(!(!pros::competition::is_autonomous() && !pros::competition::is_disabled()))
-			pros::c::controller_print(pros::E_CONTROLLER_MASTER, 2, 0, (auton_sel.selector_name + "        ").c_str());
 		pros::delay(50);
 	}
 }
