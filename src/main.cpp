@@ -38,12 +38,12 @@ void initialize() {
 	// Initialize chassis and auton selector
 	chassis.initialize();
 	uiInit();
-	pros::Task ColorTask(colorTask);
-	pros::Task AntiJamTask(antiJamTask);
-	pros::Task ControllerTask(controllerTask);
-	pros::Task PathViewerTask(pathViewerTask);
-	pros::Task AngleCheckTask(angleCheckTask);
-	pros::Task MotorUpdateTask(motorUpdateTask);
+	pros::Task ColorTask(colorTask, "color sort");
+	pros::Task AntiJamTask(antiJamTask, "antijam");
+	pros::Task ControllerTask(controllerTask, "controller printing");
+	pros::Task PathViewerTask(pathViewerTask, "path viewer");
+	pros::Task AngleCheckTask(angleCheckTask, "angle checker");
+	pros::Task MotorUpdateTask(motorUpdateTask, "motor info updater");
 	master.rumble(chassis.drive_imu_calibrated() ? "." : "---");
 }
 

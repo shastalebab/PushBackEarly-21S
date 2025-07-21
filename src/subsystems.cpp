@@ -311,6 +311,22 @@ void controllerTask() {
 
 			selectedTabObj->pid_targets.pid->constants_set(constants.kp, constants.ki, constants.kd);
 
+			ofstream pidValues;
+
+		if(pros::usd::is_installed()) {
+			pidValues.open("/usd/constants.txt", ios::out | ios::trunc);
+
+			if(pidValues.is_open()) {
+				for(auto i : tabList) {
+					if(i.usePid) {
+						pidValues << "( kp: " << i.pid_targets.pid->constants_get().kp << " ki: " << i.pid_targets.pid->constants_get().ki
+								  << " kd: " << i.pid_targets.pid->constants_get().kd << " )\n";
+					}
+				}
+				pidValues.close();
+			}
+		}
+
 			pros::c::controller_print(pros::E_CONTROLLER_MASTER, 0, 0, "%c kp: %.2f     ", selected_k == 0 ? '>' : ' ', constants.kp);
 			pros::delay(50);
 			pros::c::controller_print(pros::E_CONTROLLER_MASTER, 1, 0, "%c ki: %.2f     ", selected_k == 1 ? '>' : ' ', constants.ki);

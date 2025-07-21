@@ -152,6 +152,7 @@ extern lv_obj_t* colorInd;
 extern lv_obj_t* allianceInd;
 
 // PID Tuner/Motor Info
+extern vector<MotorTab> tabList;
 extern MotorTab* selectedTabObj;
 extern bool probing;
 

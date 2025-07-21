@@ -1,17 +1,5 @@
-#include "ui.hpp"
-
-#include "autons.hpp"
-#include "liblvgl/core/lv_event.h"
-#include "liblvgl/core/lv_obj.h"
-#include "liblvgl/core/lv_obj_style.h"
-#include "liblvgl/extra/widgets/chart/lv_chart.h"
-#include "liblvgl/extra/widgets/msgbox/lv_msgbox.h"
-#include "liblvgl/misc/lv_area.h"
-#include "liblvgl/misc/lv_color.h"
-#include "liblvgl/widgets/lv_label.h"
 #include "main.h"  // IWYU pragma: keep
-#include "pros/motors.h"
-#include "subsystems.hpp"
+#include "pros/misc.hpp"
 
 // // // // // // Tasks & Non-UI // // // // // //
 
@@ -48,8 +36,6 @@ lv_obj_t* driveTab = lv_tabview_add_tab(pidTabview, "drive");
 lv_obj_t* turnTab = lv_tabview_add_tab(pidTabview, "turn");
 lv_obj_t* swingTab = lv_tabview_add_tab(pidTabview, "swing");
 lv_obj_t* headingTab = lv_tabview_add_tab(pidTabview, "heading");
-
-vector<lv_obj_t*> tabs = {chassisTab, intakeTab, driveTab, turnTab, swingTab, headingTab};
 
 lv_obj_t* motorPopup;
 
@@ -164,6 +150,8 @@ MotorTab headingTabObj = MotorTab("heading PID", theme_color, &chassis.turnPID.e
 
 MotorTab* selectedTabObj = &driveTabObj;
 
+vector<MotorTab> tabList{chassisTabObj, intakeTabObj, driveTabObj, turnTabObj, swingTabObj, headingTabObj};
+
 bool reading = false;
 bool probing = false;
 
@@ -172,6 +160,11 @@ MotorTab* current_tab = &driveTabObj;
 vector<lv_coord_t> errorData;
 
 void motorUpdateTask() {
+	ofstream swingVelo;
+	if(pros::usd::is_installed()) swingVelo.open("/usd/swing_curve.txt", ios::out | ios::app);
+	if(swingVelo.is_open()) {
+					swingVelo << "=====================================\n";
+				}
 	while(true) {
 		if(lv_tileview_get_tile_act(main_tv) == pidTuner) {
 			for(auto motor_to_update : motors_to_update) {
@@ -185,6 +178,12 @@ void motorUpdateTask() {
 
 		if(probing) {
 			errorData.push_back(*current_tab->error);
+
+			if(pros::usd::is_installed() && current_tab->name == "swing PID") {
+				if(swingVelo.is_open()) {
+					swingVelo << "(" << chassis.drive_velocity_left() << ", " << chassis.drive_velocity_right() << ")\n";
+				}
+			}
 		}
 		pros::delay(10);
 	}
@@ -443,7 +442,7 @@ void autoSelectorInit() {
 
 static void selectTab(lv_event_t* e) {
 	auto tabindex = lv_tabview_get_tab_act(pidTabview);
-	selectedTabObj = (MotorTab*)lv_obj_get_user_data(tabs[tabindex]);
+	selectedTabObj = (MotorTab*)lv_obj_get_user_data(tabList[tabindex].tab);
 	cout << "selected " << tabindex << "\n";
 }
 
@@ -461,7 +460,10 @@ static void motorUpdateEvent(lv_event_t* e) {
 
 	lv_color32_t mixed_color = lv_color_mix(current->color, current->bg_color, ratio);
 	if(temperature > current->maxtemp) {
-		mixed_color = red;
+		if(current->motor->get_temperature() > 255)
+			mixed_color = lv_color_make(-current->color.ch.red, -current->color.ch.green, -current->color.ch.blue);
+		else
+			mixed_color = red;
 	}
 
 	lv_obj_set_style_img_recolor(object, lv_color_darken(mixed_color, 60), LV_STATE_PRESSED);
@@ -477,12 +479,15 @@ static void motorPopupUpdate(lv_event_t* e) {
 
 	lv_color32_t mixed_color = lv_color_mix(current->color, current->bg_color, ratio);
 	if(temperature > current->maxtemp) {
-		mixed_color = red;
+		if(current->motor->get_temperature() > 255)
+			mixed_color = lv_color_make(-current->color.ch.red, -current->color.ch.green, -current->color.ch.blue);
+		else
+			mixed_color = red;
 	}
 
 	lv_label_set_text(lv_msgbox_get_text(motorPopup),
 					  current->motor->get_temperature() < 255 ? (std::to_string((int)(current->motor->get_temperature())) + "°C").c_str() : "Unplugged");
-	lv_obj_set_style_text_font(motorPopup, current->motor->is_installed() ? &lv_font_montserrat_36 : &lv_font_montserrat_30, LV_PART_MAIN);
+	lv_obj_set_style_text_font(motorPopup, current->motor->get_temperature() < 255 ? &lv_font_montserrat_36 : &lv_font_montserrat_30, LV_PART_MAIN);
 	lv_obj_set_style_bg_color(motorPopup, mixed_color, LV_PART_MAIN);
 }
 
