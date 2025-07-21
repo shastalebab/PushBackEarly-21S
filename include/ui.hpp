@@ -3,6 +3,7 @@
 #include "EZ-Template/api.hpp"
 #include "api.h"
 #include "autons.hpp"
+#include "subsystems.hpp"
 
 const lv_color32_t theme_color = lv_color_hex(0x00060a);
 const lv_color32_t theme_accent = lv_color_hex(0xe3f4ff);
@@ -23,7 +24,7 @@ void motorUpdateTask();
 
 class AutonObj {
    public:
-	function<void()> callback = nullptr;
+	function<void()> callback = shift;
 	string name = "no name";
 	string desc = "no description";
 	lv_color32_t color = theme_color;
@@ -33,7 +34,7 @@ class AutonSel {
    public:
 	vector<AutonObj> autons = {};
 	string selector_name = "";
-	function<void()> selector_callback = nullptr;
+	function<void()> selector_callback = shift;
 	void selector_populate(vector<AutonObj> auton_list);
 };
 
@@ -117,7 +118,7 @@ class MotorTab {
 		error = nullptr;
 		target = 0;
 		motors = {};
-		callback = nullptr;
+		callback = drive_test;
 		usePid = false;
 		pid_targets = {};
 		tab = nullptr;
@@ -148,6 +149,7 @@ extern lv_obj_t* main_tv;
 extern lv_obj_t* autoSelector;
 extern lv_obj_t* pidTuner;
 extern lv_obj_t* colorInd;
+extern lv_obj_t* allianceInd;
 
 // PID Tuner/Motor Info
 extern MotorTab* selectedTabObj;

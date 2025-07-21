@@ -1,8 +1,10 @@
+#include "subsystems.hpp"
+
 #include "main.h"  // IWYU pragma: keep
+#include "pros/misc.hpp"
 
 // Internal targets to aid tasks
 Colors allianceColor = NEUTRAL;
-Colors matchColor = allianceColor;
 int firstTarget = 0;
 int sorterTarget = 0;
 int hoarderTarget = 0;
@@ -11,10 +13,13 @@ bool inputLock = false;
 bool jamDelay = false;
 
 // Complex motors
+Jammable none = Jammable(&intakeNone, &sorterTarget, 20, 50, 50, false, false);
 Jammable first = Jammable(&intakeFirst, &firstTarget, 20, 50, 60, true, false);
 Jammable sorter = Jammable(&intakeSorter, &sorterTarget, 20, 50, 50, false, false);
 Jammable hoarder = Jammable(&intakeHoarder, &hoarderTarget, 20, 20, 50, true, false);
-Jammable indexer = Jammable(&intakeIndexer, &indexerTarget, 20, 20, 100, true, false);
+Jammable indexer = Jammable(&intakeIndexer, &indexerTarget, 20, 20, 100, false, false);
+
+Jammable* targetMotor = &sorter;
 
 //
 // Wrappers
@@ -34,6 +39,7 @@ void setIntake(int first_speed, int second_speed, int third_speed, int fourth_sp
 		if(indexer.lock != true) {
 			indexer.motor->move(fourth_speed);
 		}
+		if(inputLock) targetMotor->motor->move(-*targetMotor->target);
 		firstTarget = first_speed;
 		sorterTarget = second_speed;
 		hoarderTarget = third_speed;
@@ -55,7 +61,6 @@ void setScraper(bool state) {
 
 void setAlliance(Colors alliance) {
 	allianceColor = alliance;
-	matchColor = alliance;
 }
 
 void sendHaptic(string input) { controllerInput = input; }
@@ -71,13 +76,17 @@ void setIntakeOp() {
 	   master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_L2))
 		jamDelay = true;
 	if(shift()) {
-		if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L1) && !inputLock)	 // sorting
+		if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L1)) {	 // bottom store
 			setIntake(127, -127, -127, 127);
-		else if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L2))	// low goal evil scoring
+			targetMotor = &indexer;
+		} else if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L2)) {	// low goal evil scoring
 			setIntake(-127, -127, 127, 0);
-		else if(master.get_digital(pros::E_CONTROLLER_DIGITAL_R1))	// mid goal scoring
+			targetMotor = &first;
+		} else if(master.get_digital(pros::E_CONTROLLER_DIGITAL_R1)) {	// mid goal scoring
 			setIntake(35, -127, 127, -35);
-		else if(!inputLock) {
+			targetMotor = &first;
+		} else {
+			targetMotor = &none;
 			setIntake(0);
 			first.lock = false;
 			sorter.lock = false;
@@ -85,16 +94,19 @@ void setIntakeOp() {
 			indexer.lock = false;
 		}
 	} else {
-		if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L1) && !inputLock) {  // stowing
+		if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L1)) {	 // storing
 			setIntake(127);
+			targetMotor = &indexer;
 		} else if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L2)) {	// low goal safe scoring
 			setIntake(-127, -30, 127, 0);
+			targetMotor = &first;
 			first.limit = 5;
-		} else if(master.get_digital(pros::E_CONTROLLER_DIGITAL_R1)) {	// top goal scoring scoring
+		} else if(master.get_digital(pros::E_CONTROLLER_DIGITAL_R1)) {	// top goal scoring
 			setIntake(127, -127, 127, 127);
-		} else if(!inputLock) {
+			targetMotor = &sorter;
+		} else {
+			targetMotor = &none;
 			setIntake(0);
-
 			first.limit = 20;
 			first.lock = false;
 			sorter.lock = false;
@@ -103,6 +115,10 @@ void setIntakeOp() {
 		}
 	}
 
+	if(master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_X)) {
+		colorToggle();
+		sendHaptic("-");
+	}
 	if(master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_R2)) sendHaptic(".");
 }
 
@@ -113,10 +129,12 @@ void setScraperOp() { scraper.button_toggle(master.get_digital(pros::E_CONTROLLE
 //
 
 void colorToggle() {
-	if(allianceColor == matchColor)
-		allianceColor = NEUTRAL;
-	else
-		allianceColor = matchColor;
+	if(allianceColor == RED)
+		allianceColor = BLUE;
+	else if (allianceColor == BLUE)
+		allianceColor = RED;
+	else allianceColor = NEUTRAL;
+	colorSet(allianceColor, allianceInd);
 }
 
 void colorSet(Colors color, lv_obj_t* object) {
@@ -131,7 +149,7 @@ void colorSet(Colors color, lv_obj_t* object) {
 
 Colors colorGet() {
 	double hue = 0;
-	if(proximitySens.get_proximity() > 100) {
+	if(proximitySens.get_proximity() > 150 && proximitySens.get_proximity() <= 255) {
 		hue = colorSens.get_hue();
 		if((hue > 340 && hue < 360) || (hue > 0 && hue < 20))
 			return RED;
@@ -142,7 +160,7 @@ Colors colorGet() {
 }
 
 bool colorCompare(Colors color) {
-	if((int)allianceColor < 2 && (int)color < 2) return allianceColor != color;
+	if((int)allianceColor != 1 && (int)color != 1) return allianceColor != color;
 	return false;
 }
 
@@ -150,22 +168,23 @@ void colorTask() {
 	Colors color;
 	int sortTime = 0;
 	bool sleep = false;
-	colorSens.set_integration_time(10);
-	proximitySens.set_integration_time(10);
-	colorSens.set_led_pwm(100);
 	while(true) {
+		colorSens.set_integration_time(10);
+		proximitySens.set_integration_time(10);
+		colorSens.set_led_pwm(100);
+		proximitySens.set_led_pwm(100);
 		color = colorGet();
 		colorSet(color, colorInd);
 		if(!pros::competition::is_disabled()) {
 			if(colorCompare(color) && !sleep) {
 				if(sortTime < 10) {
 					inputLock = true;
-					intakeSorter.move(-(util::sgn(sorterTarget)) * 80);
+					targetMotor->motor->move((-*targetMotor->target));
 					sortTime++;
-					pros::delay(100);
+					pros::delay(180);
 				} else {
 					sleep = true;
-					intakeSorter.move(sorterTarget);
+					targetMotor->motor->move(*targetMotor->target);
 				}
 			} else {
 				sortTime = 0;
@@ -244,7 +263,7 @@ void controllerTask() {
 	float tempIntake;
 	int selected_k = 0;
 	while(true) {
-		if(lv_tileview_get_tile_act(main_tv) == pidTuner && !pros::competition::is_competition_switch()) {
+		if(lv_tileview_get_tile_act(main_tv) == pidTuner && !pros::competition::is_connected()) {
 			PID::Constants constants = selectedTabObj->pid_targets.pid->constants_get();
 
 			if(master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_LEFT)) {

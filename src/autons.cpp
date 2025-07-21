@@ -18,10 +18,10 @@ const int SWING_SPEED = 90;
 ///
 void default_constants() {
 	// P, I, D, and Start I
-	chassis.pid_drive_constants_set(0.0, 0.0, 0.0);		   // Fwd/rev constants, used for odom and non odom motions
-	chassis.pid_heading_constants_set(11.0, 0.0, 25.0);		   // Holds the robot straight while going forward without odom
-	chassis.pid_turn_constants_set(4.25, 2.15, 47.25, 15.0);	   // Turn in place constants
-	chassis.pid_swing_constants_set(6.0, 0.0, 65.0);		   // Swing constants
+	chassis.pid_drive_constants_set(25.25, 0.0, 147.5);		   // Fwd/rev constants, used for odom and non odom motions
+	chassis.pid_heading_constants_set(11.75, 0.0, 31.25);		   // Holds the robot straight while going forward without odom
+	chassis.pid_turn_constants_set(3.0, 0.10, 22.75, 30.0);	   // Turn in place constants
+	chassis.pid_swing_constants_set(8.0, 0.0, 86.75);		   // Swing constants
 	chassis.pid_odom_angular_constants_set(6.5, 0.0, 52.5);	   // Angular control for odom motions
 	chassis.pid_odom_boomerang_constants_set(5.8, 0.0, 32.5);  // Angular control for boomerang motions
 	chassis.pid_drive_constants_get();
@@ -35,6 +35,7 @@ void default_constants() {
 	chassis.pid_turn_chain_constant_set(4_deg);
 	chassis.pid_swing_chain_constant_set(5_deg);
 	chassis.pid_drive_chain_constant_set(4_in);
+	chassis.drive_imu_scaler_set(1.00005);
 
 	// Slew constants
 	chassis.slew_turn_constants_set(3_deg, 70);
@@ -72,11 +73,33 @@ void swing_test(int degrees) {
 }
 
 void heading_test(int degrees) {
-	chassis.pid_drive_set(12, 127);
+	/*chassis.pid_drive_set(12, 127);
 	chassis.pid_wait_quick_chain();
 	chassis.pid_turn_set(degrees, 127, raw);
 	chassis.pid_wait_quick_chain();
-	chassis.pid_drive_set(12, 127);
+	chassis.pid_drive_set(12, 127);*/
+
+	driveSet(12, 127);
+	pidWait(WAIT);
+	turnSet(45, 127);
+	pidWait(WAIT);
+	turnSet(-45, 127);
+	pidWait(WAIT);
+	turnSet(0, 127);
+	pidWait(WAIT);
+	driveSet(-12, 127);
+	pidWait(WAIT);
+}
+
+void constants_test() {
+	setPosition(85.44, 20.86, -45);
+	setIntake(-25, 0, 0, 0);
+	driveSet(30, 40);
+	pidWaitUntil(8_in);
+	setIntake(127);
+	pidWait(WAIT);
+	delayMillis(100);
+	//setIntake(35, -127, 127, -35);
 }
 
 //
@@ -90,18 +113,18 @@ void right_split() {
 	pidWait(WAIT);
 	swingSet(LEFT_SWING, -45, 50, -20, ccw);
 	pidWait(WAIT);
-	setIntake(127, -5);
+	setIntake(127);
 	driveSet(30, 40);
 	pidWait(WAIT);
 	delayMillis(100);
-	setIntake(-90, -127, 0);
+	setIntake(-127, -30, 127, 0);
 	delayMillis(1000);
 	// Grab blocks under long goal
 	setIntake(0);
 	swingSet(RIGHT_SWING, 60, SWING_SPEED);
 	pidWait(CHAIN);
 	driveSet(29.5, 90);
-	setIntake(127, -5);
+	setIntake(127);
 	pidWait(WAIT);
 	setScraper(true);
 	delayMillis(500);
@@ -122,7 +145,7 @@ void right_split() {
 	setScraper(false);
 	driveSet(12.5, DRIVE_SPEED);
 	pidWait(WAIT);
-	setIntake(127, -127);
+	setIntake(127, -127, 127, 127);
 }
 
 void right_greed() {}
@@ -134,22 +157,22 @@ void right_awp() {
 	pidWait(WAIT);
 	turnSet(-45, TURN_SPEED);
 	pidWait(WAIT);
-	setIntake(127, 0);
+	setIntake(127);
 	driveSet(26, 80);
 	pidWait(WAIT);
-	setIntake(-127, 0);
+	setIntake(-127, -30, 127, 0);
 	delayMillis(1000);
 	// Score preload on high goal
 	swingSet(RIGHT_SWING, 135, SWING_SPEED);
 	pidWait(CHAIN);
 	driveSet(-10, 90);
-	setIntake(127);
+	setIntake(35, -127, 127, -35);
 	pidWait(WAIT);
 	delayMillis(1000);
 	// Grab blocks under long goal
 	swingSet(RIGHT_SWING, 45, SWING_SPEED, 55, ccw);
 	pidWait(CHAIN);
-	setIntake(127, 0);
+	setIntake(127);
 	driveSet(10, DRIVE_SPEED);
 	pidWait(WAIT);
 	swingSet(LEFT_SWING, 294, SWING_SPEED, 50, ccw);
@@ -161,7 +184,7 @@ void right_awp() {
 	delayMillis(500);
 	driveSet(-29.5, DRIVE_SPEED);
 	pidWait(WAIT);
-	setIntake(127);
+	setIntake(127, -127, 127, 127);
 }
 
 //
@@ -170,22 +193,22 @@ void right_awp() {
 
 void left_split() {
 	setPosition(58.56, 20.86, -45);
-	// Collect and score middle three blocks in low goal
+	// Collect and score middle three blocks in mid goal
 	driveSet(30, DRIVE_SPEED);
 	pidWait(WAIT);
 	swingSet(RIGHT_SWING, 45, 50, -20, cw);
 	pidWait(WAIT);
-	setIntake(127, -5);
+	setIntake(127);
 	driveSet(30, 40);
 	pidWait(WAIT);
-	setIntake(127, 127);
+	setIntake(35, -127, 127, -35);
 	delayMillis(1500);
 	// Grab blocks under long goal
 	setIntake(0);
 	swingSet(LEFT_SWING, -60, SWING_SPEED);
 	pidWait(CHAIN);
 	driveSet(29.5, 90);
-	setIntake(127, -5);
+	setIntake(127);
 	pidWait(WAIT);
 	setScraper(true);
 	delayMillis(500);
@@ -206,7 +229,7 @@ void left_split() {
 	setScraper(false);
 	driveSet(12.5, DRIVE_SPEED);
 	pidWait(WAIT);
-	setIntake(127, -127);
+	setIntake(127, -127, 127, 127);
 }
 
 void left_greed() {}
@@ -221,9 +244,9 @@ void left_awp() {
 	driveSet(36, DRIVE_SPEED);
 	pidWait(WAIT);
 	// Score preload on bottom goal (placed on top of side rollers, wedged in first stage)
-	setIntake(-127);
+	setIntake(127);
 	delayMillis(250);
-	setIntake(127, 0);
+	setIntake(-127, -30, 127, 0);
 	// Grab 5 blocks
 	driveSet(-11, 80);
 	pidWait(WAIT);
@@ -239,7 +262,7 @@ void left_awp() {
 	pidWait(WAIT);
 	driveSet(-5.5, 80);
 	pidWait(WAIT);
-	setIntake(127);
+	setIntake(35, -127, 127, -35);
 	delayMillis(1200);
 	// Grab blocks from loader and score on long goal
 	driveSet(47, DRIVE_SPEED);
@@ -248,11 +271,11 @@ void left_awp() {
 	pidWait(WAIT);
 	driveSet(14, DRIVE_SPEED);
 	pidWait(WAIT);
-	setIntake(127, 0);
+	setIntake(127);
 	delayMillis(750);
 	driveSet(-29, DRIVE_SPEED);
 	pidWait(WAIT);
-	setIntake(127);
+	setIntake(127, -127, 127, 127);
 }
 
 //

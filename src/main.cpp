@@ -4,8 +4,8 @@
 // Chassis constructor
 ez::Drive chassis(
 	// These are your drive motors, the first motor is used for sensing!
-	{-1, -19, -20},  // Left Chassis Ports (negative port will reverse it!)
-	{8, 9, 10},	   // Right Chassis Ports (negative port will reverse it!)
+	{-2, -18, -19},  // Left Chassis Ports (negative port will reverse it!)
+	{4, 9, 10},	   // Right Chassis Ports (negative port will reverse it!)
 
 	12,				// IMU Port
 	WHEEL_DIAMETER,	// Wheel Diameter (Remember, 4" wheels without screw holes are actually 4.125!)
@@ -19,7 +19,7 @@ void initialize() {
 
 	// Configure your chassis controls
 	chassis.opcontrol_curve_buttons_toggle(false);	// Enables modifying the controller curve with buttons on the joysticks
-	chassis.opcontrol_drive_activebrake_set(2.0);	// Sets the active brake kP. We recommend ~2.  0 will disable.
+	chassis.opcontrol_drive_activebrake_set(0.0);	// Sets the active brake kP. We recommend ~2.  0 will disable.
 	chassis.opcontrol_curve_default_set(
 		3.0, 0.0);	// Defaults for curve. If using tank, only the first parameter is used. (Comment this line out if you have an SD card!)
 
@@ -31,7 +31,8 @@ void initialize() {
 		{right_split, "right_split", "right side 4 + 5", gray},
 		{right_awp, "right_awp", "right side 3 + 1 + 5 solo AWP", violet},
 		{left_split, "left_split", "left side 4 + 5", lv_color_lighten(gray, 125)},
-		{left_awp, "left_awp", "left side 1 + 5 + 3 solo AWP", pink}
+		{left_awp, "left_awp", "left side 1 + 5 + 3 solo AWP", pink},
+		{constants_test, "constants_test", "drive, turn, and check heading", green}
 	});
 
 	// Initialize chassis and auton selector

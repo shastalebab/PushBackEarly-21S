@@ -102,7 +102,7 @@ void resetViewer(bool full) {
 		auton_sel.selector_callback();
 		pathDisplay = injectPath(autonPath, .5);
 		autonMode = preference;
-		lv_img_set_src(autonField, &(matchColor == BLUE ? blue_alliance : red_alliance));
+		lv_img_set_src(autonField, &(allianceColor == BLUE ? blue_alliance : red_alliance));
 	}
 	pathIter = 0;
 }
@@ -149,18 +149,18 @@ vector<MotorDisp> intakeMotors = {
 	MotorDisp(&intakeFirst, "first stage", lv_color_lighten(blue, 80), 50), MotorDisp(&intakeSorter, "second stage", lv_color_lighten(blue, 80), 50),
 	MotorDisp(&intakeHoarder, "third stage", lv_color_lighten(blue, 80), 50), MotorDisp(&intakeIndexer, "fourth stage", lv_color_lighten(blue, 80), 50)};
 
-MotorTab chassisTabObj =
-	MotorTab("chassis", theme_color, &chassis.leftPID.error, 24, chassisMotors, drive_test, false, PidTunerValues(0.25, 0.05, 0.25, &chassis.fwd_rev_drivePID), chassisTab);
-MotorTab intakeTabObj =
-	MotorTab("intake", theme_color, &chassis.leftPID.error, 24, intakeMotors, drive_test, false, PidTunerValues(0.25, 0.05, 0.25, &chassis.fwd_rev_drivePID), intakeTab);
-MotorTab driveTabObj =
-	MotorTab("drive PID", theme_color, &chassis.leftPID.error, 24, chassisMotors, drive_test, true, PidTunerValues(0.25, 0.05, 0.25, &chassis.fwd_rev_drivePID), driveTab);
+MotorTab chassisTabObj = MotorTab("chassis", theme_color, &chassis.leftPID.error, 24, chassisMotors, drive_test, false,
+								  PidTunerValues(0.25, 0.05, 0.25, &chassis.fwd_rev_drivePID), chassisTab);
+MotorTab intakeTabObj = MotorTab("intake", theme_color, &chassis.leftPID.error, 24, intakeMotors, drive_test, false,
+								 PidTunerValues(0.25, 0.05, 0.25, &chassis.fwd_rev_drivePID), intakeTab);
+MotorTab driveTabObj = MotorTab("drive PID", theme_color, &chassis.leftPID.error, -24, chassisMotors, drive_test, true,
+								PidTunerValues(0.25, 0.05, 0.25, &chassis.fwd_rev_drivePID), driveTab);
 MotorTab turnTabObj =
 	MotorTab("turn PID", theme_color, &chassis.turnPID.error, 360, chassisMotors, turn_test, true, PidTunerValues(0.25, 0.05, 0.25, &chassis.turnPID), turnTab);
-MotorTab swingTabObj =
-	MotorTab("swing PID", theme_color, &chassis.swingPID.error, 45, chassisMotors, swing_test, true, PidTunerValues(0.25, 0.05, 0.25, &chassis.fwd_rev_swingPID), swingTab);
-MotorTab headingTabObj =
-	MotorTab("heading PID", theme_color, &chassis.headingPID.error, 180, chassisMotors, heading_test, true, PidTunerValues(0.25, 0.05, 0.25, &chassis.headingPID), headingTab);
+MotorTab swingTabObj = MotorTab("swing PID", theme_color, &chassis.swingPID.error, 90, chassisMotors, swing_test, true,
+								PidTunerValues(0.25, 0.05, 0.25, &chassis.fwd_rev_swingPID), swingTab);
+MotorTab headingTabObj = MotorTab("heading PID", theme_color, &chassis.turnPID.error, 180, chassisMotors, heading_test, true,
+								  PidTunerValues(0.25, 0.05, 0.25, &chassis.headingPID), headingTab);
 
 MotorTab* selectedTabObj = &driveTabObj;
 
@@ -270,7 +270,7 @@ void uiInit() {
 	lv_obj_move_foreground(allianceInd);
 	lv_obj_move_foreground(colorOverlay);
 	lv_obj_move_foreground(allianceOverlay);
-	colorSet(matchColor, allianceInd);
+	colorSet(allianceColor, allianceInd);
 
 	// Set up page up/down
 	lv_label_set_text(pageUp, LV_SYMBOL_UP);
@@ -341,8 +341,8 @@ static void pauseEvent(lv_event_t* e) {
 }
 
 static void colorEvent(lv_event_t* e) {
-	matchColor = (Colors)(((int)matchColor + 1) % 3);
-	colorSet(matchColor, allianceInd);
+	setAlliance((Colors)(((int)allianceColor + 1) % 3));
+	colorSet(allianceColor, allianceInd);
 	resetViewer(true);
 }
 
@@ -441,9 +441,9 @@ void autoSelectorInit() {
 // PID Tuner/Motor Info
 //
 
-static void selectTab(lv_event_t* e) { 
+static void selectTab(lv_event_t* e) {
 	auto tabindex = lv_tabview_get_tab_act(pidTabview);
-	selectedTabObj = (MotorTab*)lv_obj_get_user_data(tabs[tabindex]); 
+	selectedTabObj = (MotorTab*)lv_obj_get_user_data(tabs[tabindex]);
 	cout << "selected " << tabindex << "\n";
 }
 
@@ -499,9 +499,9 @@ static void motorDownEvent(lv_event_t* e) {
 static void motorMsgboxEvent(lv_event_t* e) {
 	MotorDisp* current = (MotorDisp*)lv_event_get_user_data(e);
 
-	motorPopup = lv_msgbox_create(NULL, current->name.c_str(),
-								  current->motor->get_temperature() < 255 ? (std::to_string((int)(current->motor->get_temperature())) + "°C").c_str() : "Unplugged",
-								  nullptr, true);
+	motorPopup = lv_msgbox_create(
+		NULL, current->name.c_str(),
+		current->motor->get_temperature() < 255 ? (std::to_string((int)(current->motor->get_temperature())) + "°C").c_str() : "Unplugged", nullptr, true);
 	lv_obj_t* popupClose = lv_msgbox_get_close_btn(motorPopup);
 
 	lv_obj_add_style(popupClose, &pushback, LV_PART_MAIN);
@@ -526,31 +526,33 @@ static void pidProbeEvent(lv_event_t* e) {
 	current_tab = (MotorTab*)lv_event_get_user_data(e);
 	lv_obj_t* graph = lv_event_get_target(e);
 
-	errorData = {};
-	probing = true;
-	chassis.pid_targets_reset();
-	chassis.drive_imu_reset();
-	chassis.drive_sensor_reset();
-	pros::motor_brake_mode_e_t brakePreference = chassis.drive_brake_get();
-	double activebrakePreference = chassis.opcontrol_drive_activebrake_get();
-	chassis.drive_brake_set(pros::E_MOTOR_BRAKE_HOLD);
-	chassis.opcontrol_drive_activebrake_set(0.0);
-	current_tab->callback(current_tab->target);
-	chassis.pid_wait();
-	probing = false;
-	chassis.drive_brake_set(brakePreference);
-	chassis.opcontrol_drive_activebrake_set(activebrakePreference);
-	chassis.opcontrol_drive_sensors_reset();
+	if(!pros::competition::is_connected()) {
+		errorData = {};
+		probing = true;
+		chassis.pid_targets_reset();
+		chassis.drive_imu_reset();
+		chassis.drive_sensor_reset();
+		pros::motor_brake_mode_e_t brakePreference = chassis.drive_brake_get();
+		double activebrakePreference = chassis.opcontrol_drive_activebrake_get();
+		chassis.drive_brake_set(pros::E_MOTOR_BRAKE_HOLD);
+		chassis.opcontrol_drive_activebrake_set(0.0);
+		current_tab->callback(current_tab->target);
+		chassis.pid_wait();
+		probing = false;
+		chassis.drive_brake_set(brakePreference);
+		chassis.opcontrol_drive_activebrake_set(activebrakePreference);
+		chassis.opcontrol_drive_sensors_reset();
 
-	int start = errorData.size() - 201;
-	if(start < 0) start = 0;
+		int start = errorData.size() - 201;
+		if(start < 0) start = 0;
 
-	for(int i = 0; i < 200; i++) {
-		auto datapoint = start + i < errorData.size() ? errorData[start + i] : errorData.back();
-		current_tab->errorPoints[i] = -datapoint;
+		for(int i = 0; i < 200; i++) {
+			auto datapoint = start + i < errorData.size() ? errorData[start + i] : errorData.back();
+			current_tab->errorPoints[i] = -datapoint;
+		}
+
+		lv_chart_refresh(graph);
 	}
-
-	lv_chart_refresh(graph);
 }
 
 lv_event_cb_t SelectTab = selectTab;

@@ -8,10 +8,11 @@ extern Drive chassis;
 
 // Your motors, sensors, etc. should go here.  Below are examples
 
-inline pros::Optical colorSens(2);
-inline pros::Optical proximitySens(3);
+inline pros::Optical colorSens(13);
+inline pros::Optical proximitySens(1);
 
-inline pros::Motor intakeFirst(4);
+inline pros::Motor intakeNone(21);
+inline pros::Motor intakeFirst(3);
 inline pros::Motor intakeSorter(-5);
 inline pros::Motor intakeHoarder(6);
 inline pros::Motor intakeIndexer(7);
@@ -58,7 +59,6 @@ class Jammable {
 enum Colors { BLUE = 0, NEUTRAL = 1, RED = 2 };
 
 extern Colors allianceColor;
-extern Colors matchColor;
 
 bool shift();
 
