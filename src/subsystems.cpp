@@ -19,7 +19,7 @@ Jammable sorter = Jammable(&intakeSorter, &sorterTarget, 20, 50, 50, false, fals
 Jammable hoarder = Jammable(&intakeHoarder, &hoarderTarget, 20, 20, 50, true, false);
 Jammable indexer = Jammable(&intakeIndexer, &indexerTarget, 20, 20, 100, false, false);
 
-Jammable* targetMotor = &sorter;
+Jammable* targetMotor = &indexer;
 
 //
 // Wrappers
@@ -59,6 +59,12 @@ void setScraper(bool state) {
 	}
 }
 
+void setDumper(bool state) {
+	if(autonMode != BRAIN) {
+		dumper.set(state);
+	}
+}
+
 void setAlliance(Colors alliance) {
 	allianceColor = alliance;
 }
@@ -76,14 +82,14 @@ void setIntakeOp() {
 	   master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_L2))
 		jamDelay = true;
 	if(shift()) {
-		if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L1)) {	 // bottom store
-			setIntake(127, -127, -127, 127);
+		if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L1)) {	 // short store
+			setIntake(127, 127, -127, 30);
 			targetMotor = &indexer;
 		} else if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L2)) {	// low goal evil scoring
 			setIntake(-127, -127, 127, 0);
 			targetMotor = &first;
 		} else if(master.get_digital(pros::E_CONTROLLER_DIGITAL_R1)) {	// mid goal scoring
-			setIntake(35, -127, 127, -35);
+			setIntake(50, -70, 55, -25);
 			targetMotor = &first;
 		} else {
 			targetMotor = &none;
@@ -98,7 +104,7 @@ void setIntakeOp() {
 			setIntake(127);
 			targetMotor = &indexer;
 		} else if(master.get_digital(pros::E_CONTROLLER_DIGITAL_L2)) {	// low goal safe scoring
-			setIntake(-127, -30, 127, 0);
+			setIntake(-45, -60, 70, 0);
 			targetMotor = &first;
 			first.limit = 5;
 		} else if(master.get_digital(pros::E_CONTROLLER_DIGITAL_R1)) {	// top goal scoring
@@ -123,6 +129,8 @@ void setIntakeOp() {
 }
 
 void setScraperOp() { scraper.button_toggle(master.get_digital(pros::E_CONTROLLER_DIGITAL_Y)); }
+
+void setDumperOp() { dumper.button_toggle(master.get_digital(pros::E_CONTROLLER_DIGITAL_RIGHT)); }
 
 //
 // Color sort
@@ -171,8 +179,8 @@ void colorTask() {
 	while(true) {
 		colorSens.set_integration_time(10);
 		proximitySens.set_integration_time(10);
-		colorSens.set_led_pwm(100);
-		proximitySens.set_led_pwm(100);
+		colorSens.set_led_pwm(10);
+		proximitySens.set_led_pwm(0);
 		color = colorGet();
 		colorSet(color, colorInd);
 		if(!pros::competition::is_disabled()) {

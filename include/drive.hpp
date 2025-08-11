@@ -4,7 +4,7 @@
 #include "EZ-Template/util.hpp"
 
 const double WHEEL_DIAMETER = 2.8469137379;
-const double ROBOT_WIDTH = 10.5;
+const double ROBOT_WIDTH = 10.3125;
 const int KEY = 267267;
 
 enum AutonMode {

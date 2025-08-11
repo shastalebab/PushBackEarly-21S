@@ -139,8 +139,8 @@ MotorTab chassisTabObj = MotorTab("chassis", theme_color, &chassis.leftPID.error
 								  PidTunerValues(0.25, 0.05, 0.25, &chassis.fwd_rev_drivePID), chassisTab);
 MotorTab intakeTabObj = MotorTab("intake", theme_color, &chassis.leftPID.error, 24, intakeMotors, drive_test, false,
 								 PidTunerValues(0.25, 0.05, 0.25, &chassis.fwd_rev_drivePID), intakeTab);
-MotorTab driveTabObj = MotorTab("drive PID", theme_color, &chassis.leftPID.error, -24, chassisMotors, drive_test, true,
-								PidTunerValues(0.25, 0.05, 0.25, &chassis.fwd_rev_drivePID), driveTab);
+MotorTab driveTabObj = MotorTab("drive PID", theme_color, &chassis.leftPID.error, 24, chassisMotors, drive_test, true,
+								PidTunerValues(0.25, 0.05, 0.25, &chassis.forward_drivePID), driveTab);
 MotorTab turnTabObj =
 	MotorTab("turn PID", theme_color, &chassis.turnPID.error, 360, chassisMotors, turn_test, true, PidTunerValues(0.25, 0.05, 0.25, &chassis.turnPID), turnTab);
 MotorTab swingTabObj = MotorTab("swing PID", theme_color, &chassis.swingPID.error, 90, chassisMotors, swing_test, true,
@@ -160,6 +160,7 @@ MotorTab* current_tab = &driveTabObj;
 vector<lv_coord_t> errorData;
 
 void motorUpdateTask() {
+	int cnt = 0;
 	ofstream swingVelo;
 	if(pros::usd::is_installed()) swingVelo.open("/usd/swing_curve.txt", ios::out | ios::app);
 	if(swingVelo.is_open()) {
@@ -181,10 +182,11 @@ void motorUpdateTask() {
 
 			if(pros::usd::is_installed() && current_tab->name == "swing PID") {
 				if(swingVelo.is_open()) {
-					swingVelo << "(" << chassis.drive_velocity_left() << ", " << chassis.drive_velocity_right() << ")\n";
+					swingVelo << "(" << cnt << ", " << chassis.drive_get()[0] << "), (" << cnt << ", " << chassis.drive_get()[1] << ")\n";
 				}
 			}
-		}
+			cnt++;
+		} else cnt = 0;
 		pros::delay(10);
 	}
 }
@@ -406,7 +408,7 @@ void autoSelectorInit() {
 	lv_obj_set_style_text_line_space(autonUp, -12, LV_PART_MAIN);
 	lv_obj_set_style_text_line_space(autonDown, -12, LV_PART_MAIN);
 	lv_obj_set_style_pad_all(autonDesc, 5, LV_PART_MAIN);
-	lv_obj_set_style_pad_right(autonDesc, 85, LV_PART_MAIN);
+	lv_obj_set_style_pad_right(autonDesc, 111, LV_PART_MAIN);
 	lv_obj_set_style_pad_hor(autonTable, 0, LV_PART_MAIN);
 
 	lv_obj_set_scrollbar_mode(autonTable, LV_SCROLLBAR_MODE_OFF);

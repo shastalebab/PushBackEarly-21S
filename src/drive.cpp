@@ -239,7 +239,7 @@ void moveToPoint(Coordinate newpoint, drive_directions direction, int speed) {
 			break;
 		default:
 			turnSet(getTheta(currentPoint, newpoint, direction), speed);
-			pidWait(CHAIN);
+			pidWait(WAIT);
 			driveSet((getDistance(currentPoint, newpoint) * (direction == rev ? -1 : 1)), speed);
 			break;
 	}
@@ -391,6 +391,8 @@ void swingSet(e_swing side, double theta, double main, double opp, e_angle_behav
 	// Convert main/opposite voltages to left/right voltages
 	double right = side == RIGHT_SWING ? main : opp;
 	double left = side == LEFT_SWING ? main : opp;
+	right = util::clamp(right, 117);
+	left = util::clamp(left, 117);
 
 	// Convert voltage to velocity
 	double v_left = getVelocity(left);

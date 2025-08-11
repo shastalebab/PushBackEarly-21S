@@ -1,5 +1,4 @@
 #include "main.h"
-#include "drive.hpp"
 
 // Chassis constructor
 ez::Drive chassis(
@@ -21,18 +20,20 @@ void initialize() {
 	chassis.opcontrol_curve_buttons_toggle(false);	// Enables modifying the controller curve with buttons on the joysticks
 	chassis.opcontrol_drive_activebrake_set(0.0);	// Sets the active brake kP. We recommend ~2.  0 will disable.
 	chassis.opcontrol_curve_default_set(
-		3.0, 0.0);	// Defaults for curve. If using tank, only the first parameter is used. (Comment this line out if you have an SD card!)
+		0.0, 0.0);	// Defaults for curve. If using tank, only the first parameter is used. (Comment this line out if you have an SD card!)
 
 	// Set the drive to your own constants from autons.cpp!
 	default_constants();
 
 	// Autonomous Selector using LLEMU
 	auton_sel.selector_populate({
+		{right_greed, "right_greed", "right side 9 in long goal", lv_color_darken(green, 60)},
 		{right_split, "right_split", "right side 4 + 5", gray},
-		{right_awp, "right_awp", "right side 3 + 1 + 5 solo AWP", violet},
+		{right_awp, "right_awp", "right side 4 + 3 + 3 solo AWP", violet},
+		{left_greed, "left_greed", "left side 9 in long goal", green},
 		{left_split, "left_split", "left side 4 + 5", lv_color_lighten(gray, 125)},
-		{left_awp, "left_awp", "left side 1 + 5 + 3 solo AWP", pink},
-		{constants_test, "constants_test", "drive, turn, and check heading", green}
+		{left_awp, "left_awp", "left side 4 + 3 + 3 solo AWP", pink},
+		{constants_test, "constants_test", "drive and turn", blue}
 	});
 
 	// Initialize chassis and auton selector
@@ -76,6 +77,7 @@ void opcontrol() {
 
 		setIntakeOp();
 		setScraperOp();
+		setDumperOp();
 
 		pros::delay(ez::util::DELAY_TIME);	// This is used for timer calculations!  Keep this ez::util::DELAY_TIME
 	}

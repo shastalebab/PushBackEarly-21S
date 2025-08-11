@@ -17,6 +17,7 @@ inline pros::Motor intakeSorter(-5);
 inline pros::Motor intakeHoarder(6);
 inline pros::Motor intakeIndexer(7);
 inline ez::Piston scraper('A');
+inline ez::Piston dumper('B');
 
 class Jammable {
    private:
@@ -31,7 +32,7 @@ class Jammable {
 	bool ignoreSort;
 	bool pause;
 
-    bool lock;
+	bool lock;
 	void checkJam();
 
 	Jammable() {
@@ -42,23 +43,30 @@ class Jammable {
 		maxTemp = 55;
 		ignoreSort = true;
 		pause = false;
-        lock = false;
+		lock = false;
 	}
 	Jammable(pros::Motor* Motor, int* Target, int Limit, int Attempts, float MaxTemp, bool IgnoreSort, bool Pause) {
-        motor = Motor;
+		motor = Motor;
 		target = Target;
 		attempts = Attempts;
 		limit = Limit;
 		maxTemp = MaxTemp;
 		ignoreSort = IgnoreSort;
 		pause = Pause;
-        lock = false;
-    }
+		lock = false;
+	}
 };
 
 enum Colors { BLUE = 0, NEUTRAL = 1, RED = 2 };
 
 extern Colors allianceColor;
+extern Jammable none;
+extern Jammable first;
+extern Jammable sorter;
+extern Jammable hoarder;
+extern Jammable indexer;
+
+extern Jammable* targetMotor;
 
 bool shift();
 
@@ -67,6 +75,7 @@ void setIntake(int intake_speed, int snail_speed, int outtake_speed);
 void setIntake(int intake_speed, int outtake_speed);
 void setIntake(int speed);
 void setScraper(bool state);
+void setDumper(bool state);
 
 void setAlliance(Colors alliance);
 void colorToggle();
@@ -76,6 +85,7 @@ void sendHaptic(string input);
 
 void setIntakeOp();
 void setScraperOp();
+void setDumperOp();
 
 void colorTask();
 void antiJamTask();
